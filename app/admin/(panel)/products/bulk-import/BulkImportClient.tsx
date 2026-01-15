@@ -38,10 +38,33 @@ export default function BulkImportClient() {
       }
 
       const importResults = result.results || [];
-      setResults(importResults);
+      
+      // Map BulkImportResult[] to ImportResult[]
+      // BulkImportResult has: inputUrl, normalizedUrl, status, message, etc.
+      // ImportResult needs: success, url, productName, error, etc.
+      const mappedResults: ImportResult[] = importResults.map((r) => {
+        const success = r.status === "success";
+        // Extract product name from message if it follows pattern "Produkt importert: {name}"
+        let productName: string | undefined = undefined;
+        if (success && r.message) {
+          const match = r.message.match(/Produkt importert:\s*(.+)/);
+          productName = match ? match[1].trim() : r.message;
+        }
+        
+        return {
+          success,
+          url: r.inputUrl || r.normalizedUrl || "",
+          productName,
+          error: !success ? r.message : undefined,
+          // images, price, variants are not available in BulkImportResult
+          // but are optional in ImportResult, so we leave them undefined
+        };
+      });
+      
+      setResults(mappedResults);
 
       // Vis suksessmelding hvis noen produkter ble importert
-      const successful = importResults.filter((r: ImportResult) => r.success);
+      const successful = mappedResults.filter((r) => r.success);
       if (successful.length > 0) {
         setTimeout(() => {
           router.push("/admin/products");
