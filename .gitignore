@@ -1,0 +1,33 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build
+.next/
+dist/
+out/
+.turbo/
+tsconfig.tsbuildinfo
+
+# Env/secrets
+.env
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# Prisma
+prisma/dev.db
+*.db-journal
+
+# Logs
+logs
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
