@@ -62,7 +62,6 @@ export const product = {
   sku: "LUM-LED-001",
   brand: "Luminera",
   name: "LED Leseskjerm for Nattlesing",
-  image: "/products/bookbright/BR.avif",
   tagline: "Les i senga uten å forstyrre andre – mykt og jevnt lys over hele siden",
   description: "En transparent LED-leseskjerm som gir jevn belysning over hele boksiden. Perfekt for nattlesing uten å forstyrre partneren din. Med varmt, mykt lys, 99-min timer og lang batteritid.",
   rating: {

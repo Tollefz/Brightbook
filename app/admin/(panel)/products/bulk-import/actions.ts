@@ -17,6 +17,30 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36).substring(2, 6);
 }
 
+/**
+ * Type guard: Checks if a string is a valid SupplierName enum value.
+ * Uses Prisma enum values: "alibaba", "ebay", "temu"
+ */
+function isSupplierName(value: string): value is "alibaba" | "ebay" | "temu" {
+  return value === "alibaba" || value === "ebay" || value === "temu";
+}
+
+/**
+ * Converts a provider name string to SupplierName enum value.
+ * Normalizes the input (trim, lowercase) and maps known provider names.
+ * Returns null if no match is found.
+ */
+function toSupplierName(value: string | null | undefined): "alibaba" | "ebay" | "temu" | null {
+  if (!value || typeof value !== "string") {
+    return null;
+  }
+  
+  const normalized = value.trim().toLowerCase();
+  
+  // Use type guard to ensure type safety
+  return isSupplierName(normalized) ? normalized : null;
+}
+
 async function importProduct(
   inputUrl: string,
   providerName?: string
@@ -55,12 +79,8 @@ async function importProduct(
 
     const providerUsed = provider.getName();
 
-    // Convert provider name to SupplierName enum (alibaba, ebay, temu)
-    // If provider name doesn't match enum, use null
-    const supplierName: "alibaba" | "ebay" | "temu" | null = 
-      providerUsed === "alibaba" || providerUsed === "ebay" || providerUsed === "temu"
-        ? providerUsed
-        : null;
+    // Convert provider name to SupplierName enum using type-safe helper
+    const supplierName = toSupplierName(providerUsed);
 
     // Normalize URL
     const normalizedUrl = provider.normalizeUrl(inputUrl);

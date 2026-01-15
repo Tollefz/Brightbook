@@ -37,7 +37,7 @@ export default function NightReadingLanding() {
       productId: product.productId,
       name: product.name,
       price: product.price.amount,
-      image: product.heroImage || product.image || "/products/bookbright/BR.avif",
+      image: product.heroImage || product.images[0]?.src || "/products/bookbright/BR.avif",
       quantity: 1,
       slug: product.productId,
     }, 1);
