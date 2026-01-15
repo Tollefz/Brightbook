@@ -22,10 +22,22 @@ async function importProduct(
   providerName?: string
 ): Promise<BulkImportResult> {
   try {
+    // Guard: Ensure URL is provided and valid
+    if (!inputUrl || typeof inputUrl !== "string" || inputUrl.trim().length === 0) {
+      return {
+        inputUrl: inputUrl || "",
+        normalizedUrl: inputUrl || "",
+        providerUsed: "none",
+        status: "error",
+        message: "Mangler URL",
+        warnings: [],
+      };
+    }
+
     const registry = getProviderRegistry();
     
     // Get provider (by name or auto-detect)
-    const provider = registry.getProviderForUrl(url, providerName);
+    const provider = registry.getProviderForUrl(inputUrl, providerName);
     
     const warnings: string[] = [];
     
@@ -42,6 +54,13 @@ async function importProduct(
     }
 
     const providerUsed = provider.getName();
+
+    // Convert provider name to SupplierName enum (alibaba, ebay, temu)
+    // If provider name doesn't match enum, use null
+    const supplierName: "alibaba" | "ebay" | "temu" | null = 
+      providerUsed === "alibaba" || providerUsed === "ebay" || providerUsed === "temu"
+        ? providerUsed
+        : null;
 
     // Normalize URL
     const normalizedUrl = provider.normalizeUrl(inputUrl);
@@ -193,7 +212,7 @@ async function importProduct(
           isActive: true,
           storeId: DEFAULT_STORE_ID,
           supplierUrl: normalizedUrl,
-          supplierName: providerUsed,
+          supplierName: supplierName,
         variants: hasVariants
           ? {
               create: variants.map((variant, index) => {
