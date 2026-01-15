@@ -7,6 +7,7 @@ import { safeQuery } from "@/lib/safeQuery";
 import { DEFAULT_STORE_ID } from "@/lib/store";
 import { getProviderRegistry } from "@/lib/providers/server-only";
 import type { BulkImportResult } from "@/lib/providers";
+import type { SupplierName } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,13 +25,16 @@ function generateId(): string {
  * Normalizes the input (trim, lowercase) and maps known provider names.
  * Returns null if no match is found.
  * 
- * Mapping:
- * - "temu" -> "temu"
- * - "alibaba" -> "alibaba"
- * - "ebay" -> "ebay"
+ * This function ensures type safety by returning SupplierName | null,
+ * which matches Prisma's expected type for the supplierName field.
+ * 
+ * Mapping (based on Prisma enum SupplierName):
+ * - "temu" -> SupplierName.temu
+ * - "alibaba" -> SupplierName.alibaba
+ * - "ebay" -> SupplierName.ebay
  * - Other values -> null
  */
-function toSupplierName(value: string | null | undefined): "alibaba" | "ebay" | "temu" | null {
+function toSupplierName(value: string | null | undefined): SupplierName | null {
   if (!value || typeof value !== "string") {
     return null;
   }
@@ -38,14 +42,15 @@ function toSupplierName(value: string | null | undefined): "alibaba" | "ebay" | 
   const normalized = value.trim().toLowerCase();
   
   // Map known provider names to SupplierName enum values
+  // TypeScript ensures these match the Prisma enum values
   if (normalized === "temu") {
-    return "temu";
+    return "temu" as SupplierName;
   }
   if (normalized === "alibaba") {
-    return "alibaba";
+    return "alibaba" as SupplierName;
   }
   if (normalized === "ebay") {
-    return "ebay";
+    return "ebay" as SupplierName;
   }
   
   // Return null for unknown providers
@@ -78,7 +83,8 @@ async function importProduct(
     const providerUsed = provider.getName();
 
     // Convert provider name to SupplierName enum
-    const supplierName = toSupplierName(providerUsed);
+    // This ensures type safety: supplierName is SupplierName | null, matching Prisma's type
+    const supplierName: SupplierName | null = toSupplierName(providerUsed);
 
     // Normalize URL
     const normalizedUrl = provider.normalizeUrl(inputUrl);
