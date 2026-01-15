@@ -19,6 +19,39 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36).substring(2, 6);
 }
 
+/**
+ * Converts a provider name string to SupplierName enum value.
+ * Normalizes the input (trim, lowercase) and maps known provider names.
+ * Returns null if no match is found.
+ * 
+ * Mapping:
+ * - "temu" -> "temu"
+ * - "alibaba" -> "alibaba"
+ * - "ebay" -> "ebay"
+ * - Other values -> null
+ */
+function toSupplierName(value: string | null | undefined): "alibaba" | "ebay" | "temu" | null {
+  if (!value || typeof value !== "string") {
+    return null;
+  }
+  
+  const normalized = value.trim().toLowerCase();
+  
+  // Map known provider names to SupplierName enum values
+  if (normalized === "temu") {
+    return "temu";
+  }
+  if (normalized === "alibaba") {
+    return "alibaba";
+  }
+  if (normalized === "ebay") {
+    return "ebay";
+  }
+  
+  // Return null for unknown providers
+  return null;
+}
+
 async function importProduct(
   inputUrl: string,
   providerName?: string
@@ -43,6 +76,9 @@ async function importProduct(
     }
 
     const providerUsed = provider.getName();
+
+    // Convert provider name to SupplierName enum
+    const supplierName = toSupplierName(providerUsed);
 
     // Normalize URL
     const normalizedUrl = provider.normalizeUrl(inputUrl);
@@ -205,7 +241,7 @@ async function importProduct(
           isActive: true,
           storeId: DEFAULT_STORE_ID, // Set storeId so products appear in frontend
           supplierUrl: normalizedUrl,
-          supplierName: providerUsed,
+          supplierName: supplierName,
         variants: hasVariants
           ? {
               create: variants.map((variant, index) => {
