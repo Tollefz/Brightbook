@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Download, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { importProducts } from "./actions";
+import type { BulkImportResult } from "@/lib/providers/types";
 
 interface ImportResult {
   success: boolean;
@@ -37,30 +38,40 @@ export default function BulkImportClient() {
         return;
       }
 
-      const importResults = result.results || [];
-      
-      // Map BulkImportResult[] to ImportResult[]
-      // BulkImportResult has: inputUrl, normalizedUrl, status, message, etc.
-      // ImportResult needs: success, url, productName, error, etc.
-      const mappedResults: ImportResult[] = importResults.map((r) => {
-        const success = r.status === "success";
-        // Extract product name from message if it follows pattern "Produkt importert: {name}"
+      // Type-safe handling: After error check, results is guaranteed to be BulkImportResult[]
+      // Use explicit type guard to ensure type safety
+      if (!result.results || !Array.isArray(result.results)) {
+        setError("Uventet feil: Ingen resultater mottatt");
+        setIsPending(false);
+        return;
+      }
+
+      // Map BulkImportResult[] to ImportResult[] before setState
+      const mappedResults: ImportResult[] = result.results.map((r: BulkImportResult) => {
+        // Map BulkImportResult.status to ImportResult.success
+        const success = r.status === "success" || r.status === "warning";
+
+        // Use normalizedUrl or inputUrl as fallback
+        const url = r.normalizedUrl || r.inputUrl || "";
+
+        // Extract product name from message if available
         let productName: string | undefined = undefined;
         if (success && r.message) {
           const match = r.message.match(/Produkt importert:\s*(.+)/);
           productName = match ? match[1].trim() : r.message;
         }
-        
+
         return {
           success,
-          url: r.inputUrl || r.normalizedUrl || "",
+          url,
           productName,
           error: !success ? r.message : undefined,
-          // images, price, variants are not available in BulkImportResult
-          // but are optional in ImportResult, so we leave them undefined
-        };
+          images: undefined,
+          price: undefined,
+          variants: undefined,
+        } satisfies ImportResult;
       });
-      
+
       setResults(mappedResults);
 
       // Vis suksessmelding hvis noen produkter ble importert
