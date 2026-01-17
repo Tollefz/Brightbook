@@ -5,42 +5,42 @@ const prisma = new PrismaClient();
 
 /**
  * Ensure admin user exists in database
- * Reads password from ADMIN_PASSWORD env var, or uses fallback (must be changed)
+ * Always updates password to "Tollef220900" when seed runs
  */
 async function ensureAdminUser() {
   const adminEmail = "rob.tol@hotmail.com";
-  
-  // Read password from env, or use fallback (MUST be changed if using fallback)
-  const adminPassword = process.env.ADMIN_PASSWORD || "VELG_ET_PASSORD_HER";
-  
-  if (adminPassword === "VELG_ET_PASSORD_HER") {
-    console.warn("⚠️  WARNING: Using fallback password. Set ADMIN_PASSWORD env var or change password in seed.ts");
-  }
+  const adminPassword = "Tollef220900"; // Hardcoded admin password
 
   // Check if admin user already exists
   const existingUser = await prisma.user.findUnique({
     where: { email: adminEmail },
   });
 
-  if (existingUser) {
-    console.log("✅ Admin user already exists");
-    return;
-  }
-
   // Hash password with bcryptjs (10 rounds)
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
-  // Create admin user with UserRole enum
-  await prisma.user.create({
-    data: {
-      email: adminEmail,
-      password: hashedPassword,
-      name: "Admin",
-      role: UserRole.admin, // Use enum value from Prisma
-    },
-  });
-
-  console.log("✅ Admin user created");
+  if (existingUser) {
+    // Update existing admin user password
+    await prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        password: hashedPassword,
+        role: UserRole.admin, // Ensure role is admin
+      },
+    });
+    console.log("✅ Admin password updated");
+  } else {
+    // Create admin user with UserRole enum
+    await prisma.user.create({
+      data: {
+        email: adminEmail,
+        password: hashedPassword,
+        name: "Admin",
+        role: UserRole.admin, // Use enum value from Prisma
+      },
+    });
+    console.log("✅ Admin user created");
+  }
 }
 
 type SeedProduct = {
