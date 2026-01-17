@@ -26,13 +26,14 @@ interface ProductVariant {
   attributes: Record<string, string>;
   stock: number;
   isActive: boolean;
+  sortOrder?: number;
 }
 
 const DEFAULT_FORM = {
   name: "",
   price: 0,
-  compareAtPrice: 0,
-  supplierPrice: 0,
+  compareAtPrice: null as number | null,
+  supplierPrice: null as number | null,
   supplierUrl: "",
   supplierName: "",
   description: "",
@@ -54,6 +55,7 @@ export default function EditProduct() {
   const [formData, setFormData] = useState(DEFAULT_FORM);
   const [images, setImages] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [scrapeResult, setScrapeResult] = useState<{
     images?: string[];
@@ -71,13 +73,14 @@ export default function EditProduct() {
   const [editingVariantIndex, setEditingVariantIndex] = useState<number | null>(null);
   const [variantForm, setVariantForm] = useState<ProductVariant>({
     name: "",
-    price: formData.price,
-    compareAtPrice: formData.compareAtPrice,
-    supplierPrice: formData.supplierPrice,
+    price: formData.price ?? 0,
+    compareAtPrice: formData.compareAtPrice ?? undefined,
+    supplierPrice: formData.supplierPrice ?? undefined,
     image: "",
     attributes: {},
     stock: 10,
     isActive: true,
+    sortOrder: 0,
   });
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiModalType, setAiModalType] = useState<"productDescription" | "seo">("productDescription");
@@ -100,17 +103,47 @@ export default function EditProduct() {
           throw new Error("Produkt ikke funnet");
         }
 
-        const product = await response.json();
+        const responseData = await response.json();
+        
+        // Handle API response format: { ok: true, data: product } or direct product
+        const product = responseData.data || responseData;
+        
+        if (!product || !product.id) {
+          throw new Error("Produkt ikke funnet eller ugyldig data");
+        }
+
+        // Log product data for debugging (dev only)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[EditProduct] Loaded product:', {
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            compareAtPrice: product.compareAtPrice,
+            supplierPrice: product.supplierPrice,
+            category: product.category,
+            hasDescription: !!product.description,
+            hasShortDescription: !!product.shortDescription,
+            hasImages: !!product.images,
+            hasTags: !!product.tags,
+          });
+        }
 
         const productImages =
           typeof product.images === "string" ? product.images : JSON.stringify(product.images ?? []);
         const parsedImages = parseImagesFromString(productImages);
 
+        // Safe number conversion: null/undefined -> null, not NaN
+        const safeNumber = (val: any): number | null => {
+          if (val === null || val === undefined) return null;
+          const num = Number(val);
+          return isNaN(num) ? null : num;
+        };
+
         setFormData({
           name: product.name ?? "",
-          price: Number(product.price) ?? 0,
-          compareAtPrice: Number(product.compareAtPrice) ?? 0,
-          supplierPrice: Number(product.supplierPrice) ?? 0,
+          price: safeNumber(product.price) ?? 0,
+          compareAtPrice: safeNumber(product.compareAtPrice) ?? null,
+          supplierPrice: safeNumber(product.supplierPrice) ?? null,
           supplierUrl: product.supplierUrl ?? "",
           supplierName: product.supplierName ?? "",
           description: product.description ?? "",
@@ -146,6 +179,77 @@ export default function EditProduct() {
       setImages(updatedImages);
       setFormData({ ...formData, images: JSON.stringify(updatedImages) });
       setNewImageUrl("");
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    // Validate file types and sizes
+    const fileArray = Array.from(files);
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif", "image/avif"];
+
+    for (const file of fileArray) {
+      if (!allowedTypes.includes(file.type)) {
+        setError(`Filtypen ${file.type} er ikke tillatt. Tillatte typer: jpg, png, webp, gif, avif`);
+        return;
+      }
+      if (file.size > maxSize) {
+        setError(`Bildet ${file.name} er for stort. Maks størrelse: 10MB`);
+        return;
+      }
+    }
+
+    if (fileArray.length > 10) {
+      setError("Maks 10 bilder kan lastes opp samtidig");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+
+    try {
+      const formData = new FormData();
+      fileArray.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      const response = await fetch("/api/admin/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Kunne ikke laste opp bilder");
+      }
+
+      // Add uploaded image URLs to images array
+      if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
+        const updatedImages = [...images, ...data.urls];
+        setImages(updatedImages);
+        setFormData({ ...formData, images: JSON.stringify(updatedImages) });
+        
+        // Log for debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[EditProduct] Images updated:', {
+            oldCount: images.length,
+            newCount: updatedImages.length,
+            newUrls: data.urls,
+          });
+        }
+      } else {
+        throw new Error("Ingen URL-er mottatt fra server");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Feil ved opplasting av bilder");
+    } finally {
+      setUploading(false);
+      // Reset file input
+      event.target.value = "";
     }
   };
 
@@ -230,7 +334,7 @@ export default function EditProduct() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          images: JSON.stringify(images),
+          images: images, // Send as array, API will handle JSON.stringify
         }),
       });
 
@@ -279,13 +383,14 @@ export default function EditProduct() {
     // Reset form
     setVariantForm({
       name: "",
-      price: formData.price,
-      compareAtPrice: formData.compareAtPrice,
-      supplierPrice: formData.supplierPrice,
+      price: formData.price ?? 0,
+      compareAtPrice: formData.compareAtPrice ?? undefined,
+      supplierPrice: formData.supplierPrice ?? undefined,
       image: "",
       attributes: {},
       stock: 10,
       isActive: true,
+      sortOrder: variants.length, // Set sortOrder to next index
     });
     setShowVariantForm(false);
   };
@@ -326,8 +431,8 @@ export default function EditProduct() {
       const newVariants: ProductVariant[] = scrapeResult.variants.map((v) => ({
         name: v.name,
         price: v.price,
-        compareAtPrice: formData.compareAtPrice,
-        supplierPrice: formData.supplierPrice,
+        compareAtPrice: formData.compareAtPrice ?? undefined,
+        supplierPrice: formData.supplierPrice ?? undefined,
         image: v.image || images[0] || "",
         attributes: v.attributes || {},
         stock: 10,
@@ -337,8 +442,8 @@ export default function EditProduct() {
     }
   };
 
-  const profit = formData.price - formData.supplierPrice;
-  const profitPercentage = formData.supplierPrice > 0 ? (profit / formData.supplierPrice) * 100 : 0;
+  const profit = formData.price - (formData.supplierPrice ?? 0);
+  const profitPercentage = (formData.supplierPrice ?? 0) > 0 ? (profit / (formData.supplierPrice ?? 1)) * 100 : 0;
 
   if (loading) {
     return (
@@ -398,8 +503,14 @@ export default function EditProduct() {
             <label className="mb-1 block text-sm font-medium">Leverandørpris (NOK)</label>
             <input
               type="number"
-              value={formData.supplierPrice}
-              onChange={(e) => setFormData({ ...formData, supplierPrice: parseFloat(e.target.value) || 0 })}
+              value={formData.supplierPrice ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormData({ 
+                  ...formData, 
+                  supplierPrice: value === "" ? null : (parseFloat(value) || null)
+                });
+              }}
               className="w-full rounded-lg border border-slate-300 p-3"
             />
           </div>
@@ -408,8 +519,14 @@ export default function EditProduct() {
             <label className="mb-1 block text-sm font-medium">Din Salgspris (NOK)</label>
             <input
               type="number"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+              value={formData.price ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormData({ 
+                  ...formData, 
+                  price: value === "" ? 0 : (parseFloat(value) || 0)
+                });
+              }}
               className="w-full rounded-lg border border-slate-300 p-3"
               required
             />
@@ -419,8 +536,14 @@ export default function EditProduct() {
             <label className="mb-1 block text-sm font-medium">Før-pris (NOK)</label>
             <input
               type="number"
-              value={formData.compareAtPrice}
-              onChange={(e) => setFormData({ ...formData, compareAtPrice: parseFloat(e.target.value) || 0 })}
+              value={formData.compareAtPrice ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormData({ 
+                  ...formData, 
+                  compareAtPrice: value === "" ? null : (parseFloat(value) || null)
+                });
+              }}
               className="w-full rounded-lg border border-slate-300 p-3"
             />
           </div>
@@ -647,33 +770,54 @@ export default function EditProduct() {
           )}
 
           {/* Legg til nytt bilde */}
-          <div className="flex gap-2">
-            <input
-              type="url"
-              value={newImageUrl}
-              onChange={(e) => setNewImageUrl(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAddImage();
-                }
-              }}
-              placeholder="https://example.com/bilde.jpg (eller .png, .webp, osv.)"
-              className="flex-1 rounded-lg border border-slate-300 p-3"
-            />
-            <button
-              type="button"
-              onClick={handleAddImage}
-              disabled={!newImageUrl.trim()}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-3 text-white transition hover:bg-primary-dark disabled:opacity-50"
-            >
-              <ImageIcon size={20} />
-              Legg til bilde
-            </button>
+          <div className="space-y-3">
+            {/* File upload */}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-4 transition hover:border-primary hover:bg-slate-100">
+                <ImageIcon size={20} className="text-slate-600" />
+                <span className="text-sm font-medium text-slate-700">
+                  {uploading ? "Laster opp..." : "Last opp bilder fra filer"}
+                </span>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif"
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* URL input */}
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={newImageUrl}
+                onChange={(e) => setNewImageUrl(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddImage();
+                  }
+                }}
+                placeholder="https://example.com/bilde.jpg (eller .png, .webp, osv.)"
+                className="flex-1 rounded-lg border border-slate-300 p-3"
+              />
+              <button
+                type="button"
+                onClick={handleAddImage}
+                disabled={!newImageUrl.trim()}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-3 text-white transition hover:bg-primary-dark disabled:opacity-50"
+              >
+                <ImageIcon size={20} />
+                Legg til URL
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Last opp bilder fra filer (maks 10MB per bilde, opptil 10 bilder) eller lim inn bildelenke (URL)
+            </p>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Lim inn bildelenke (URL) - må ende med .jpg, .png, .webp, osv. eller være fra Alibaba/eBay/Temu CDN
-          </p>
         </div>
 
         <div className="mt-4">
@@ -869,21 +1013,44 @@ export default function EditProduct() {
               </h4>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Navn *</label>
+                  <label className="mb-1 block text-sm font-medium">Farge/Navn *</label>
                   <input
                     type="text"
                     value={variantForm.name}
                     onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
-                    placeholder="f.eks. Rød - 2m, Large - Blå"
+                    placeholder="f.eks. Pink, White, Black"
                     className="w-full rounded-lg border border-slate-300 p-2"
                   />
+                  <p className="mt-1 text-xs text-gray-500">Navn på varianten (f.eks. farge)</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Sorteringsrekkefølge</label>
+                  <input
+                    type="number"
+                    value={variantForm.sortOrder ?? 0}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setVariantForm({ 
+                        ...variantForm, 
+                        sortOrder: value === "" ? 0 : (parseInt(value, 10) || 0)
+                      });
+                    }}
+                    className="w-full rounded-lg border border-slate-300 p-2"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Lavere tall vises først (0, 1, 2...)</p>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium">Pris (NOK)</label>
                   <input
                     type="number"
-                    value={variantForm.price}
-                    onChange={(e) => setVariantForm({ ...variantForm, price: parseFloat(e.target.value) || 0 })}
+                    value={variantForm.price ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setVariantForm({ 
+                        ...variantForm, 
+                        price: value === "" ? 0 : (parseFloat(value) || 0)
+                      });
+                    }}
                     className="w-full rounded-lg border border-slate-300 p-2"
                   />
                 </div>
@@ -891,8 +1058,14 @@ export default function EditProduct() {
                   <label className="mb-1 block text-sm font-medium">Før-pris (NOK)</label>
                   <input
                     type="number"
-                    value={variantForm.compareAtPrice || ""}
-                    onChange={(e) => setVariantForm({ ...variantForm, compareAtPrice: parseFloat(e.target.value) || undefined })}
+                    value={variantForm.compareAtPrice ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setVariantForm({ 
+                        ...variantForm, 
+                        compareAtPrice: value === "" ? undefined : (parseFloat(value) || undefined)
+                      });
+                    }}
                     className="w-full rounded-lg border border-slate-300 p-2"
                   />
                 </div>
@@ -900,20 +1073,99 @@ export default function EditProduct() {
                   <label className="mb-1 block text-sm font-medium">Lager</label>
                   <input
                     type="number"
-                    value={variantForm.stock}
-                    onChange={(e) => setVariantForm({ ...variantForm, stock: parseInt(e.target.value) || 0 })}
+                    value={variantForm.stock ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setVariantForm({ 
+                        ...variantForm, 
+                        stock: value === "" ? 0 : (parseInt(value, 10) || 0)
+                      });
+                    }}
                     className="w-full rounded-lg border border-slate-300 p-2"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium">Bilde URL (valgfritt)</label>
-                  <input
-                    type="url"
-                    value={variantForm.image || ""}
-                    onChange={(e) => setVariantForm({ ...variantForm, image: e.target.value })}
-                    placeholder="https://example.com/bilde.jpg"
-                    className="w-full rounded-lg border border-slate-300 p-2"
-                  />
+                  <label className="mb-1 block text-sm font-medium">Variantbilde (valgfritt)</label>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={variantForm.image || ""}
+                        onChange={(e) => setVariantForm({ ...variantForm, image: e.target.value })}
+                        placeholder="https://example.com/bilde.jpg eller last opp bilde"
+                        className="flex-1 rounded-lg border border-slate-300 p-2"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          setUploading(true);
+                          try {
+                            const formData = new FormData();
+                            formData.append("files", file);
+                            
+                            const response = await fetch("/api/admin/upload-image", {
+                              method: "POST",
+                              body: formData,
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (response.ok && data.urls && data.urls.length > 0) {
+                              setVariantForm({ ...variantForm, image: data.urls[0] });
+                            } else {
+                              setError(data.error || "Kunne ikke laste opp bilde");
+                            }
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Feil ved opplasting");
+                          } finally {
+                            setUploading(false);
+                            e.target.value = ""; // Reset file input
+                          }
+                        }}
+                        className="hidden"
+                        id={`variant-image-upload-${editingVariantIndex ?? 'new'}`}
+                        disabled={uploading}
+                      />
+                      <label
+                        htmlFor={`variant-image-upload-${editingVariantIndex ?? 'new'}`}
+                        className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            Laster opp...
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon size={16} />
+                            Last opp
+                          </>
+                        )}
+                      </label>
+                    </div>
+                    {variantForm.image && (
+                      <div className="relative h-24 w-24 overflow-hidden rounded border">
+                        <Image
+                          src={variantForm.image}
+                          alt="Variant preview"
+                          fill
+                          className="object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      Last opp bilde eller lim inn URL. Dette bildet vises når varianten er valgt på produktsiden.
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="mt-4 flex gap-2">
@@ -941,7 +1193,7 @@ export default function EditProduct() {
           {/* Eksisterende varianter */}
           {variants.length > 0 ? (
             <div className="space-y-2">
-              {variants.map((variant, index) => (
+              {[...variants].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map((variant, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between rounded-lg border border-slate-300 bg-white p-3"

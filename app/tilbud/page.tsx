@@ -55,6 +55,20 @@ async function getDiscountedProducts(storeId: string) {
       compareAtPrice: true,
       images: true,
       category: true,
+      variants: {
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          attributes: true,
+          image: true,
+          price: true,
+          stock: true,
+          sortOrder: true,
+        },
+        orderBy: { sortOrder: 'asc' },
+        take: 5, // Limit to 5 for preview
+      },
     },
   });
 }
@@ -163,6 +177,7 @@ export default async function TilbudPage() {
                       images: images,
                       category: product.category,
                     }}
+                    variants={product.variants || []}
                   />
                 </div>
               );

@@ -115,30 +115,43 @@ export default function CheckoutPage() {
   const [discountMessage, setDiscountMessage] = useState<string | null>(null);
   const [affiliateCode, setAffiliateCode] = useState<string | null>(null);
   const [stripeKeyStatus, setStripeKeyStatus] = useState<"checking" | "ok" | "missing">("checking");
+  const [checkoutMode, setCheckoutMode] = useState<"stripe" | "test">("stripe");
   const router = useRouter();
   const { items, total, clearCart, updateQuantity, removeFromCart, isUpdating } = useCart();
 
-  // Verifiser Stripe keys ved mount
+  // Determine checkout mode and verify Stripe keys
   useEffect(() => {
-    let publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || "";
-    
-    // Fjern ekstra anførselstegn hvis de er der (f.eks. ""pk_test_..."")
-    // Dette skjer hvis man har ekstra anførselstegn i .env filen
-    publishableKey = publishableKey.replace(/^["']+|["']+$/g, "");
-    publishableKey = publishableKey.trim();
-    
-    if (publishableKey && (publishableKey.startsWith("pk_test_") || publishableKey.startsWith("pk_live_"))) {
-      setStripeKeyStatus("ok");
-    } else {
-      setStripeKeyStatus("missing");
-      // Log kun i development, men ikke som errors (for å unngå error overlay)
-      if (process.env.NODE_ENV === "development") {
-        // Bruk console.warn i stedet for console.error for å unngå error overlay
-        console.warn("⚠️ Stripe publishable key mangler eller er ugyldig");
-        if (!publishableKey) {
-          console.warn("💡 Legg til NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY i .env filen");
+    // Get checkout mode from env (default: "test" in dev, "stripe" in prod)
+    // Note: NEXT_PUBLIC_ prefix is needed for client-side access
+    const mode = process.env.NEXT_PUBLIC_CHECKOUT_MODE || 
+                 (process.env.NODE_ENV === "production" ? "stripe" : "test");
+    setCheckoutMode(mode as "stripe" | "test");
+
+    // Only check Stripe keys if mode is "stripe"
+    if (mode === "stripe") {
+      let publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || "";
+      
+      // Fjern ekstra anførselstegn hvis de er der (f.eks. ""pk_test_..."")
+      // Dette skjer hvis man har ekstra anførselstegn i .env filen
+      publishableKey = publishableKey.replace(/^["']+|["']+$/g, "");
+      publishableKey = publishableKey.trim();
+      
+      if (publishableKey && (publishableKey.startsWith("pk_test_") || publishableKey.startsWith("pk_live_"))) {
+        setStripeKeyStatus("ok");
+      } else {
+        setStripeKeyStatus("missing");
+        // Log kun i development, men ikke som errors (for å unngå error overlay)
+        if (process.env.NODE_ENV === "development") {
+          // Bruk console.warn i stedet for console.error for å unngå error overlay
+          console.warn("⚠️ Stripe publishable key mangler eller er ugyldig");
+          if (!publishableKey) {
+            console.warn("💡 Legg til NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY i .env filen");
+          }
         }
       }
+    } else {
+      // Test mode - Stripe keys not needed
+      setStripeKeyStatus("ok"); // Set to "ok" to hide warnings
     }
   }, []);
 
@@ -151,7 +164,8 @@ export default function CheckoutPage() {
     defaultValues: { country: "NO" },
   });
 
-  const shippingCost = shippingMethod === "standard" ? (total >= 500 ? 0 : 99) : 199;
+  // Fixed shipping cost: always 99 kr (no free shipping)
+  const shippingCost = shippingMethod === "standard" ? 99 : 199;
   const grandTotal = Math.max(0, total + shippingCost - discountAmount);
 
   useEffect(() => {
@@ -214,7 +228,76 @@ export default function CheckoutPage() {
     setStep(4);
   };
 
+  const handleTestCheckout = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const infoData = infoForm.getValues();
+      const addressData = addressForm.getValues();
+
+      // Valider at vi har all nødvendig data
+      if (!infoData.email || !infoData.fullName) {
+        throw new Error("Manglende kundeinformasjon");
+      }
+      if (!addressData.address1 || !addressData.zipCode || !addressData.city) {
+        throw new Error("Manglende leveringsadresse");
+      }
+      if (items.length === 0) {
+        throw new Error("Handlekurven er tom");
+      }
+
+      const response = await fetch("/api/checkout/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            variantId: item.variantId,
+            variantName: item.variantName,
+          })),
+          customer: {
+            email: infoData.email,
+            name: infoData.fullName,
+            fullName: infoData.fullName,
+            phone: infoData.phone,
+            address1: addressData.address1,
+            address2: addressData.address2,
+            zipCode: addressData.zipCode,
+            city: addressData.city,
+            country: addressData.country,
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Kunne ikke opprette testordre");
+      }
+
+      if (data.ok && data.redirectUrl) {
+        clearCart();
+        window.location.href = data.redirectUrl;
+      } else {
+        throw new Error("Uventet respons fra server");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke opprette testordre");
+      console.error("Error creating test order:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePaymentMethod = async () => {
+    // If in test mode, use test checkout
+    if (checkoutMode === "test") {
+      await handleTestCheckout();
+      return;
+    }
+
     // Hvis Stripe keys mangler, vis en proff melding og la brukeren fortsette
     if (stripeKeyStatus === "missing" || !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
       // I stedet for å stoppe flyten, vis en melding og la brukeren se ordresammendrag
@@ -329,15 +412,15 @@ export default function CheckoutPage() {
             <span
               className={`flex h-8 w-8 items-center justify-center rounded-full border-2 font-semibold transition-all ${
                 step > index + 1
-                  ? "border-green-600 bg-green-600 text-white"
+                  ? "border-gray-900 bg-gray-900 text-white"
                   : step === index + 1
-                    ? "border-green-600 bg-green-50 text-green-600"
+                    ? "border-gray-900 bg-gray-50 text-gray-900"
                     : "border-gray-300 bg-white text-gray-400"
               }`}
             >
               {index + 1}
             </span>
-            <span className={`hidden sm:inline ${step === index + 1 ? "text-green-600 font-semibold" : step > index + 1 ? "text-gray-600" : "text-gray-400"}`}>{label}</span>
+            <span className={`hidden sm:inline ${step === index + 1 ? "text-gray-900 font-semibold" : step > index + 1 ? "text-gray-600" : "text-gray-400"}`}>{label}</span>
           </div>
         ))}
       </div>
@@ -355,11 +438,11 @@ export default function CheckoutPage() {
                 placeholder="Rabattkode"
                 className="flex-1"
               />
-              <Button type="button" onClick={applyDiscount} className="bg-green-600 hover:bg-green-700 text-white">
+              <Button type="button" onClick={applyDiscount} className="bg-gray-900 hover:bg-gray-800 text-white">
                 Aktiver
               </Button>
             </div>
-            {discountMessage && <p className="text-sm text-green-700 font-medium">{discountMessage}</p>}
+            {discountMessage && <p className="text-sm text-gray-700 font-medium">{discountMessage}</p>}
           </div>
           {step === 1 && (
             <form
@@ -388,7 +471,7 @@ export default function CheckoutPage() {
                 placeholder="Telefon"
                 {...infoForm.register("phone")}
               />
-              <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white">
+              <Button type="submit" className="w-full bg-gray-900 hover:bg-gray-800 text-white">
                 Fortsett til levering
               </Button>
             </form>
@@ -443,7 +526,7 @@ export default function CheckoutPage() {
                 <option value="SE">Sverige</option>
                 <option value="DK">Danmark</option>
               </select>
-              <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white">
+              <Button type="submit" className="w-full bg-gray-900 hover:bg-gray-800 text-white">
                 Fortsett til leveringsmetode
               </Button>
             </form>
@@ -478,7 +561,7 @@ export default function CheckoutPage() {
                   </div>
                 </label>
               </div>
-              <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={handleShippingMethod}>
+              <Button className="w-full bg-gray-900 hover:bg-gray-800 text-white" onClick={handleShippingMethod}>
                 Fortsett til betaling
               </Button>
             </div>
@@ -494,51 +577,93 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {stripeKeyStatus === "missing" && (
-                <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-600">
-                  ⚠️ Stripe er ikke konfigurert. NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY mangler i .env filen.
-                </div>
-              )}
-
-              <div className="space-y-3">
-                {[
-                  { value: "card", label: "Kort (Visa/Mastercard)", available: true },
-                  { value: "vipps", label: "Vipps", available: false },
-                  { value: "klarna", label: "Klarna", available: false },
-                ].map((option) => (
-                  <label
-                    key={option.value}
-                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 ${
-                      !option.available ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
+              {checkoutMode === "test" ? (
+                // Test mode - show test checkout button
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="text-blue-600 font-semibold">🧪 Testbetaling (DEV-only)</span>
+                    </div>
+                    <p className="text-sm text-blue-700">
+                      Du er i test-modus. Ordre vil bli opprettet uten faktisk betaling.
+                    </p>
+                  </div>
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                    onClick={handleTestCheckout}
+                    disabled={loading}
                   >
-                    <input
-                      type="radio"
-                      checked={paymentMethod === option.value}
-                      onChange={() => option.available && setPaymentMethod(option.value)}
-                      disabled={!option.available}
-                    />
-                    <span className="font-semibold text-slate-900">
-                      {option.label}
-                      {!option.available && " (Kommer snart)"}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <Button
-                className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-                onClick={handlePaymentMethod}
-                disabled={loading || stripeKeyStatus === "missing" || paymentMethod !== "card"}
-              >
-                {loading ? (
-                  <>
-                    <span className="mr-2">⏳</span>
-                    Oppretter betaling...
-                  </>
-                ) : (
-                  "Fortsett til betalingsformular"
-                )}
-              </Button>
+                    {loading ? (
+                      <>
+                        <span className="mr-2">⏳</span>
+                        Oppretter testordre...
+                      </>
+                    ) : (
+                      "Fullfør testordre (ingen betaling)"
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                // Stripe mode - show payment options
+                <>
+                  {stripeKeyStatus === "missing" && (
+                    <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-yellow-600 font-semibold">⚠️ Stripe er ikke konfigurert</span>
+                      </div>
+                      <div className="text-sm text-yellow-700 space-y-1">
+                        <p>Følgende miljøvariabler mangler i <code className="bg-yellow-100 px-1 rounded">.env.local</code>:</p>
+                        <ul className="list-disc list-inside ml-2 space-y-0.5">
+                          <li><code className="bg-yellow-100 px-1 rounded">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code></li>
+                          <li><code className="bg-yellow-100 px-1 rounded">STRIPE_SECRET_KEY</code></li>
+                        </ul>
+                        <p className="mt-2">Se <code className="bg-yellow-100 px-1 rounded">STRIPE_SETUP.md</code> for instruksjoner.</p>
+                        <p className="mt-2 font-medium">Alternativ: Sett <code className="bg-yellow-100 px-1 rounded">NEXT_PUBLIC_CHECKOUT_MODE=test</code> for testbetaling.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {[
+                      { value: "card", label: "Kort (Visa/Mastercard)", available: true },
+                      { value: "vipps", label: "Vipps", available: false },
+                      { value: "klarna", label: "Klarna", available: false },
+                    ].map((option) => (
+                      <label
+                        key={option.value}
+                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 ${
+                          !option.available ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          checked={paymentMethod === option.value}
+                          onChange={() => option.available && setPaymentMethod(option.value)}
+                          disabled={!option.available}
+                        />
+                        <span className="font-semibold text-slate-900">
+                          {option.label}
+                          {!option.available && " (Kommer snart)"}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <Button
+                    className="w-full bg-gray-900 hover:bg-gray-800 text-white disabled:opacity-50"
+                    onClick={handlePaymentMethod}
+                    disabled={loading || (stripeKeyStatus === "missing" && checkoutMode === "stripe") || paymentMethod !== "card"}
+                  >
+                    {loading ? (
+                      <>
+                        <span className="mr-2">⏳</span>
+                        Oppretter betaling...
+                      </>
+                    ) : (
+                      "Fortsett til betalingsformular"
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
@@ -566,7 +691,7 @@ export default function CheckoutPage() {
                         </div>
                         <div className="flex justify-between">
                           <span>Frakt:</span>
-                          <span className="font-medium">{shippingCost === 0 ? "Gratis" : formatCurrency(shippingCost)}</span>
+                          <span className="font-medium">{formatCurrency(shippingCost)}</span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold text-gray-900">
                           <span>Total:</span>
@@ -590,7 +715,7 @@ export default function CheckoutPage() {
                     locale: "no",
                   }}
                 >
-                  <div className="mb-4 rounded-lg bg-green-900/20 border border-green-600 p-4 text-sm text-green-400">
+                  <div className="mb-4 rounded-lg bg-gray-50 border border-gray-300 p-4 text-sm text-gray-700">
                     💡 <strong>Test kort:</strong> 4242 4242 4242 4242<br />
                     CVV: 123 | Utløpsdato: Hvilken som helst fremtidig dato
                   </div>
@@ -649,11 +774,10 @@ export default function CheckoutPage() {
             shippingCost={shippingCost}
             discountAmount={discountAmount}
             total={grandTotal}
-            freeShippingThreshold={500}
             className="border-t pt-4"
           />
           {discountMessage && (
-            <p className="text-xs text-green-700 mt-2">{discountMessage}</p>
+            <p className="text-xs text-gray-700 mt-2">{discountMessage}</p>
           )}
         </aside>
       </div>

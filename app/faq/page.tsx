@@ -25,7 +25,7 @@ export default function FAQPage() {
         },
         {
           q: 'Hvor mye koster frakt?',
-          a: 'Frakt er gratis over 500,-. Under 500,- koster frakten 79,-.',
+          a: 'Fast frakt: 99 kr for alle ordrer.',
         },
         {
           q: 'Kan jeg spore min ordre?',

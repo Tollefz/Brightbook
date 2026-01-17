@@ -211,7 +211,7 @@ export default async function AdminOrdersPage({
                         </div>
                         <div className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-none">
                           {items.length === 1 && items[0]?.name
-                            ? items[0].name
+                            ? `${items[0].name}${items[0]?.variantName ? ` - ${items[0].variantName}` : ""}`
                             : `${items.length} forskjellige produkter`}
                         </div>
                       </td>

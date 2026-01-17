@@ -16,9 +16,8 @@ export const SHIPPING_MESSAGES = {
   LOW_STOCK: (count: number) => `Bare ${count} på lager`,
   
   // Shipping cost
-  FREE_SHIPPING_THRESHOLD: 500,
-  FREE_SHIPPING_MESSAGE: "Gratis frakt ved kjøp over 500 kr",
-  STANDARD_SHIPPING_COST: 99,
+  FIXED_SHIPPING_COST: 99,
+  FIXED_SHIPPING_MESSAGE: "Fast frakt: 99 kr",
   
   // Full delivery info text
   DELIVERY_INFO: "Ordrene behandles manuelt etter betaling. Estimert leveringstid: 5–12 virkedager fra ordrebehandling.",

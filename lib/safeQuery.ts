@@ -24,19 +24,61 @@ export async function safeQuery<T>(
       return fallback;
     }
     
-    // Otherwise, log the error
+    // Extract detailed error information
     const errorMessage = error?.message || String(error);
     const errorName = error?.name || "UnknownError";
+    const errorCode = error?.code || null;
+    
+    // Extract database connection info (mask credentials)
+    let dbInfo = null;
+    try {
+      const dbUrl = process.env.DATABASE_URL;
+      if (dbUrl) {
+        const url = new URL(dbUrl);
+        dbInfo = {
+          host: url.hostname,
+          port: url.port || '5432',
+          database: url.pathname.replace(/^\//, ''),
+          user: url.username ? `${url.username.substring(0, 3)}***` : 'unknown',
+        };
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+    
+    // Build detailed error log
+    const errorDetails: any = {
+      error: errorMessage,
+      name: errorName,
+      ...(errorCode && { code: errorCode }),
+      ...(error?.cause && { cause: error.cause }),
+      ...(dbInfo && { database: dbInfo }),
+    };
+    
+    // Add Prisma-specific error details
+    if (errorName === 'PrismaClientKnownRequestError' || errorName === 'PrismaClientValidationError') {
+      errorDetails.prismaError = true;
+      if (error?.meta) {
+        errorDetails.meta = error.meta;
+      }
+    }
     
     if (isDev) {
       console.error(
         `❌ Failed to run query${label ? ` (${label})` : ''}`,
-        {
-          error: errorMessage,
-          name: errorName,
-          ...(error?.cause && { cause: error.cause }),
-        }
+        errorDetails
       );
+      
+      // Provide helpful hints based on error type
+      if (errorMessage.includes("Can't reach database server")) {
+        console.error('💡 Hint: Database server is not reachable. Check DATABASE_URL and network connection.');
+      } else if (errorMessage.includes("Unknown argument") || errorMessage.includes("Unknown field")) {
+        console.error('💡 Hint: Field does not exist in Prisma schema. Run: npx prisma generate && npx prisma db push');
+      } else if (errorMessage.includes("Column") && errorMessage.includes("does not exist")) {
+        console.error('💡 Hint: Database column missing. Run: npx prisma migrate dev or npx prisma db push');
+      } else if (errorMessage.includes("Prisma Client has not been generated")) {
+        console.error('💡 Hint: Prisma Client not generated. Run: npx prisma generate');
+      }
     } else {
       // In production, log but don't expose details
       console.error(

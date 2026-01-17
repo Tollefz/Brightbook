@@ -67,6 +67,8 @@ export async function GET(
         name: item.product.name,
         price: item.price,
         quantity: item.quantity,
+        variantId: item.variantId || undefined,
+        variantName: item.variantName || undefined,
       }));
     }
 
@@ -83,9 +85,12 @@ export async function GET(
     }
 
     return NextResponse.json({
-      ...order,
-      items,
-      shippingAddress,
+      ok: true,
+      data: {
+        ...order,
+        items,
+        shippingAddress,
+      },
     });
   } catch (error) {
     console.error("Error fetching order:", error);
@@ -214,6 +219,8 @@ export async function PATCH(
         name: item.product.name,
         price: item.price,
         quantity: item.quantity,
+        variantId: item.variantId || undefined,
+        variantName: item.variantName || undefined,
       }));
     }
 

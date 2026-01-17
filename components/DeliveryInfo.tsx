@@ -22,7 +22,7 @@ export default function DeliveryInfo({ variant = "compact", className = "" }: De
     <div className={`rounded-lg bg-blue-50 border border-blue-200 p-4 ${className}`}>
       <h3 className="font-semibold text-gray-900 mb-2">Leveringsinformasjon</h3>
       <ul className="text-sm text-gray-700 space-y-1">
-        <li>✓ {SHIPPING_MESSAGES.FREE_SHIPPING_MESSAGE}</li>
+        <li>✓ Fast frakt: 99 kr</li>
         <li>✓ {SHIPPING_MESSAGES.DELIVERY_INFO}</li>
         <li>✓ Leveres til hele Norge</li>
       </ul>

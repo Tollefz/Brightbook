@@ -55,16 +55,29 @@ async function getOrder(id: string) {
       items = order.items as typeof items;
     }
   } catch {
-    // Hvis parsing feiler, bruk orderItems
-    items = order.orderItems.map((item) => ({
-      productId: item.productId,
-      name: item.product.name,
-      price: item.price,
-      quantity: item.quantity,
-      image: item.product.images ? JSON.parse(item.product.images)[0] : null,
-      variantId: item.variantId || undefined,
-      variantName: item.variantName || undefined,
-    }));
+      // Hvis parsing feiler, bruk orderItems
+      items = order.orderItems.map((item) => {
+        let productImages: string[] = [];
+        try {
+          if (typeof item.product.images === "string") {
+            productImages = JSON.parse(item.product.images);
+          } else if (Array.isArray(item.product.images)) {
+            productImages = item.product.images;
+          }
+        } catch {
+          productImages = [];
+        }
+
+        return {
+          productId: item.productId,
+          name: item.product.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: productImages[0] || null,
+          variantId: item.variantId || undefined,
+          variantName: item.variantName || undefined,
+        };
+      });
   }
 
   // Parse shipping address
@@ -262,7 +275,14 @@ export default async function OrderDetailsPage({
                               />
                             )}
                             <div>
-                              <div className="font-medium text-gray-900">{item.name}</div>
+                              <div className="font-medium text-gray-900">
+                                {item.name}
+                                {item.variantName && (
+                                  <span className="ml-2 text-sm font-normal text-gray-600">
+                                    - {item.variantName}
+                                  </span>
+                                )}
+                              </div>
                               {item.productId && (
                                 <div className="text-sm text-gray-500">ID: {item.productId}</div>
                               )}
@@ -291,7 +311,7 @@ export default async function OrderDetailsPage({
                 <div className="flex justify-end gap-4">
                   <span className="text-gray-600">Frakt:</span>
                   <span className="font-medium">
-                    {order.shippingCost > 0 ? formatCurrency(Number(order.shippingCost)) : "Gratis"}
+                    {formatCurrency(Number(order.shippingCost) || 99)}
                   </span>
                 </div>
                 {order.tax > 0 && (

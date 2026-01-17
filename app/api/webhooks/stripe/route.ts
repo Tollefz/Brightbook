@@ -37,12 +37,19 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!webhookSecret) {
-    console.error("❌ STRIPE_WEBHOOK_SECRET is not set in environment variables");
+  // Webhook secret is optional in development (for local testing without webhooks)
+  // In production, it should be set for security
+  if (!webhookSecret && process.env.NODE_ENV === "production") {
+    console.error("❌ STRIPE_WEBHOOK_SECRET is not set in production");
     return NextResponse.json(
       { error: "Betalingssystemet er ikke konfigurert." },
       { status: 500 }
     );
+  }
+  
+  // In development, allow webhook to proceed without secret (less secure, but OK for local testing)
+  if (!webhookSecret && process.env.NODE_ENV === "development") {
+    console.warn("⚠️ STRIPE_WEBHOOK_SECRET not set - webhook signature verification will be skipped (development only)");
   }
 
   // Valider at Stripe secret key har riktig format
@@ -64,11 +71,19 @@ export async function POST(req: Request) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      webhookSecret
-    );
+    // In development, skip signature verification if webhook secret is not set
+    if (!webhookSecret && process.env.NODE_ENV === "development") {
+      // Parse event without signature verification (development only)
+      event = JSON.parse(body) as Stripe.Event;
+      console.warn("⚠️ Webhook signature verification skipped (development mode, no webhook secret)");
+    } else {
+      // Normal signature verification
+      event = stripe.webhooks.constructEvent(
+        body,
+        signature,
+        webhookSecret
+      );
+    }
   } catch (err: any) {
     console.error("Webhook signature verification failed:", err.message);
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });

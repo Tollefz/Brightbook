@@ -62,7 +62,7 @@ export default function KundeservicePage() {
             <div>
               <h3 className="mb-2 font-semibold text-dark">Hvor lang leveringstid har dere?</h3>
               <p className="text-gray-medium">
-                Ordrene behandles manuelt etter betaling. Estimert leveringstid: 5–12 virkedager fra ordrebehandling. Gratis frakt over 500,-!
+                Ordrene behandles manuelt etter betaling. Estimert leveringstid: 5–12 virkedager fra ordrebehandling. Fast frakt: 99 kr.
               </p>
             </div>
 

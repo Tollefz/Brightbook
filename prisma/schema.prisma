@@ -52,6 +52,7 @@ model Product {
   sku               String?          @unique
   stock             Int              @default(0)
   isActive          Boolean          @default(true)
+  isHero            Boolean          @default(false)
   specs             Json?
   metaTitle         String?
   metaDescription   String?
@@ -67,6 +68,7 @@ model Product {
   @@index([category])
   @@index([supplierName])
   @@index([isActive])
+  @@index([isHero])
   @@index([storeId])
 }
 
@@ -82,6 +84,7 @@ model ProductVariant {
   attributes     Json
   stock          Int         @default(0)
   isActive       Boolean     @default(true)
+  sortOrder      Int         @default(0)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   orderItems     OrderItem[]
@@ -90,6 +93,7 @@ model ProductVariant {
   @@index([productId])
   @@index([sku])
   @@index([isActive])
+  @@index([productId, sortOrder])
 }
 
 model Order {

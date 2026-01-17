@@ -1,4 +1,4 @@
-import { compare } from "bcrypt";
+import bcrypt from "bcryptjs";
 import NextAuth, { type NextAuthOptions, getServerSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
@@ -22,19 +22,26 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        const normalizedEmail = credentials.email.toLowerCase().trim();
+        const password = credentials.password;
+
+        // Find user by email
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase() },
+          where: { email: normalizedEmail },
         });
 
+        // If user doesn't exist or has no password, return null
         if (!user?.password) {
           return null;
         }
 
-        const valid = await compare(credentials.password, user.password);
+        // Compare provided password with stored hash using bcryptjs
+        const valid = await bcrypt.compare(password, user.password);
         if (!valid) {
           return null;
         }
 
+        // Password matches, return user
         return {
           id: user.id,
           email: user.email,

@@ -11,7 +11,8 @@ export default function CartPage() {
   const { items, total, updateQuantity, removeFromCart, isUpdating } = useCart();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const shippingCost = total >= 500 ? 0 : 99;
+  // Fixed shipping cost: always 99 kr (no free shipping)
+  const shippingCost = 99;
   const totalWithShipping = total + shippingCost;
 
   if (items.length === 0) {
@@ -81,7 +82,6 @@ export default function CartPage() {
               subtotal={total}
               shippingCost={shippingCost}
               total={totalWithShipping}
-              freeShippingThreshold={500}
             />
 
             {checkoutError && (

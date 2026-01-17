@@ -6,6 +6,10 @@ import { improveTitle } from "@/lib/utils/improve-product-title";
 import { safeQuery } from "@/lib/safeQuery";
 import { logError } from "@/lib/utils/logger";
 import { DEFAULT_STORE_ID } from "@/lib/store";
+import { revalidatePath, revalidateTag } from 'next/cache';
+
+// Force dynamic rendering to allow revalidation
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   const session = await getAuthSession();
@@ -185,6 +189,20 @@ export async function POST(req: Request) {
         isActive: isActive !== undefined ? isActive : true,
       },
     });
+
+    // CRITICAL: Revalidate product pages and homepage to show new product
+    try {
+      revalidatePath('/');
+      revalidatePath('/products');
+      revalidatePath(`/products/${product.slug}`);
+      revalidateTag('products');
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[revalidate] Revalidated paths after creating product: ${product.slug}`);
+      }
+    } catch (revalidateError) {
+      // Non-critical: log but don't fail the request
+      console.warn('[revalidate] Failed to revalidate paths:', revalidateError);
+    }
 
     return NextResponse.json({ ok: true, data: product }, { status: 201 });
   } catch (error) {

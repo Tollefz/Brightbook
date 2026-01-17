@@ -5,17 +5,84 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Star, Check, Clock, Battery, Moon, BookOpen, ChevronDown, Shield, Truck } from "lucide-react";
-import { product } from "@/config/product";
+import { product as productConfig } from "@/config/product";
 import { useCart } from "@/lib/cart-context";
+import type { Product } from "@prisma/client";
 
-export default function NightReadingLanding() {
+interface NightReadingLandingProps {
+  product: Product | null;
+  heroImage: string;
+  images: string[];
+}
+
+export default function NightReadingLanding({ product, heroImage, images: productImages }: NightReadingLandingProps) {
   const [showStickyCTA, setShowStickyCTA] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [imageError, setImageError] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const { addToCart } = useCart();
 
-  const activeImage = product.images[activeImageIndex] || product.images[0];
+  // Handle null product case
+  if (!product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-amber-50/30 via-white to-white">
+        <div className="text-center max-w-md mx-auto px-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Ingen hero-produkt valgt enda
+          </h1>
+          <p className="text-lg text-gray-600 mb-6">
+            Gå til admin-panelet og merk et produkt som "Hero" (isHero=true) for å vise det på forsiden.
+          </p>
+          <a
+            href="/admin/products"
+            className="inline-block px-6 py-3 rounded-full bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-colors"
+          >
+            Gå til admin
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Format images array to match expected structure
+  const images = (productImages || []).map((src) => ({ src, alt: product.name }));
+  const activeImage = images[activeImageIndex] || images[0] || { src: heroImage, alt: product.name };
+
+  // Get product data from DB, fallback to config for UI-only content
+  const productName = product.name || productConfig.name;
+  const productDescription = product.description || product.shortDescription || productConfig.description;
+  const productTagline = product.shortDescription || productConfig.tagline;
+  const productComparePrice = product.compareAtPrice;
+  
+  // CRITICAL: Get price from product (or default variant if variants exist)
+  // Always use DB price, never fallback to config (config may be outdated)
+  let productPrice = product.price || 0;
+  const dbVariants = (product as any).variants || [];
+  if (dbVariants.length > 0) {
+    // Use price from first variant with stock > 0, or first variant, sorted by sortOrder
+    const sortedVariants = [...dbVariants].sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    const defaultVariant = sortedVariants.find((v: any) => v.stock > 0) || sortedVariants[0];
+    if (defaultVariant && defaultVariant.price) {
+      productPrice = defaultVariant.price;
+    }
+  }
+  
+  // CRITICAL: Only use product.slug from DB, never fallback to config (config slug may be outdated)
+  // If product.slug is missing, handleBuyNow will redirect to /products
+  const productSlug = product.slug;
+  
+  // Parse specs for additional data
+  const specs = (product.specs as any) || {};
+  const brand = specs.brand || productConfig.brand;
+  
+  // CRITICAL: Use variants from DB (product.variants) if available, fallback to config
+  // product.variants is included in getHeroProduct query
+  const configVariants = specs.variants || productConfig.variants || [];
+  const variants = dbVariants.length > 0 ? dbVariants : configVariants;
+  
+  // Extract features from specs or use config fallback
+  // Product model doesn't have a features field, so we get it from specs or use config
+  const features = specs.features || productConfig.features || [];
 
   const handleImageError = (src: string) => {
     setImageError((prev) => ({ ...prev, [src]: true }));
@@ -29,21 +96,41 @@ export default function NightReadingLanding() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Track selected variant (if any)
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+
   const handleBuyNow = (e: React.MouseEvent) => {
     e.preventDefault();
     
-    // Legg produktet i handlekurv
-    addToCart({
-      productId: product.productId,
-      name: product.name,
-      price: product.price.amount,
-      image: product.heroImage || product.images[0]?.src || "/products/bookbright/BR.avif",
-      quantity: 1,
-      slug: product.productId,
-    }, 1);
-
-    // Redirect til checkout
-    router.push("/checkout");
+    // CRITICAL: Validate product and slug before navigation
+    if (!product || !product.slug) {
+      // Fallback to product list if hero product is missing or invalid
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[NightReadingLanding] Hero product missing or invalid slug, redirecting to /products');
+      }
+      router.push('/products');
+      return;
+    }
+    
+    // CRITICAL: Navigate to PDP, not checkout (variant must be selected on PDP)
+    // Find default variant: first with stock > 0, or first variant, sorted by sortOrder
+    let defaultVariant = null;
+    const dbVariants = (product as any).variants || [];
+    if (dbVariants.length > 0) {
+      const sortedVariants = [...dbVariants].sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      defaultVariant = sortedVariants.find((v: any) => v.stock > 0) || sortedVariants[0];
+    }
+    
+    // Build variant query if variant exists
+    let variantQuery = '';
+    if (defaultVariant) {
+      const color = defaultVariant.attributes?.color || defaultVariant.attributes?.farge || defaultVariant.name?.toLowerCase() || '';
+      const variantSlug = color.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      variantQuery = `?variant=${variantSlug}`;
+    }
+    
+    // Navigate to PDP using validated product slug (always from DB, never fallback)
+    router.push(`/products/${product.slug}${variantQuery}`);
   };
 
   return (
@@ -56,24 +143,24 @@ export default function NightReadingLanding() {
             <div className="text-center lg:text-left">
               <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-amber-100 text-amber-800 text-sm font-semibold">
                 <Star className="h-4 w-4 fill-amber-600" />
-                {product.rating.score} ({product.rating.countText})
+                {productConfig.rating.score} ({productConfig.rating.countText})
               </div>
               
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 leading-tight">
-                {product.name}
+                {productName}
               </h1>
               
               <p className="text-xl sm:text-2xl text-gray-700 mb-6 font-medium">
-                {product.tagline}
+                {productTagline}
               </p>
               
               <p className="text-base sm:text-lg text-gray-600 mb-8 max-w-xl mx-auto lg:mx-0">
-                {product.description}
+                {productDescription}
               </p>
 
               {/* Badges Row */}
               <div className="flex flex-wrap gap-2 justify-center lg:justify-start mb-8">
-                {product.badges.map((badge, index) => (
+                {productConfig.badges.map((badge, index) => (
                   <span
                     key={index}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-amber-200 text-sm font-medium text-gray-700 shadow-sm"
@@ -87,11 +174,11 @@ export default function NightReadingLanding() {
               {/* Price */}
               <div className="flex items-baseline gap-3 justify-center lg:justify-start mb-8">
                 <span className="text-4xl sm:text-5xl font-bold text-gray-900">
-                  {product.price.display}
+                  {productPrice},-
                 </span>
-                {product.price.compareAtDisplay && (
+                {productComparePrice && (
                   <span className="text-xl text-gray-400 line-through">
-                    {product.price.compareAtDisplay}
+                    {productComparePrice},-
                   </span>
                 )}
               </div>
@@ -104,12 +191,12 @@ export default function NightReadingLanding() {
                 >
                   Kjøp nå
                 </button>
-                <a
-                  href="#how-it-works"
+                <Link
+                  href={productSlug ? `/products/${productSlug}` : "/products"}
                   className="inline-flex items-center justify-center px-8 py-4 rounded-full border-2 border-gray-300 text-gray-700 font-semibold text-lg hover:bg-gray-50 transition-colors"
                 >
                   Se hvordan det fungerer
-                </a>
+                </Link>
               </div>
 
               {/* Social Proof */}
@@ -119,16 +206,16 @@ export default function NightReadingLanding() {
                     <Star
                       key={i}
                       className={`h-4 w-4 ${
-                        i < Math.floor(product.rating.score)
+                        i < Math.floor(productConfig.rating.score)
                           ? "fill-amber-500 text-amber-500"
                           : "text-gray-300"
                       }`}
                     />
                   ))}
                 </div>
-                <span className="font-medium">{product.rating.score}</span>
+                <span className="font-medium">{productConfig.rating.score}</span>
                 <span>•</span>
-                <span>{product.rating.countText}</span>
+                <span>{productConfig.rating.countText}</span>
               </div>
             </div>
 
@@ -174,9 +261,9 @@ export default function NightReadingLanding() {
               </div>
               
               {/* Mini Gallery Thumbnails */}
-              {product.images.length > 1 && (
+              {images.length > 1 && (
                 <div className="mt-4 flex gap-2 justify-center lg:justify-start overflow-x-auto pb-2">
-                  {product.images.map((image, index) => (
+                  {images.map((image, index) => (
                     <button
                       key={index}
                       type="button"
@@ -257,7 +344,7 @@ export default function NightReadingLanding() {
             {/* Solution */}
             <div className="rounded-2xl bg-amber-50 p-8 lg:p-10 border border-amber-200">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
-                {product.name}
+                {productName}
               </h2>
               <ul className="space-y-3 text-gray-700">
                 <li className="flex items-start gap-3">
@@ -295,7 +382,7 @@ export default function NightReadingLanding() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            {product.features.map((feature, index) => (
+            {features.map((feature, index) => (
               <div
                 key={index}
                 className="rounded-xl bg-white p-6 lg:p-8 shadow-sm hover:shadow-md transition-shadow border border-gray-100"
@@ -372,12 +459,12 @@ export default function NightReadingLanding() {
               Hva våre kunder sier
             </h2>
             <p className="text-lg text-gray-600">
-              {product.rating.countText} fornøyde lesere
+              {productConfig.rating.countText} fornøyde lesere
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            {product.testimonials.map((testimonial, index) => (
+            {productConfig.testimonials.map((testimonial, index) => (
               <div
                 key={index}
                 className="rounded-xl bg-white p-6 lg:p-8 shadow-sm border border-gray-100"
@@ -414,12 +501,12 @@ export default function NightReadingLanding() {
               Ofte stilte spørsmål
             </h2>
             <p className="text-lg text-gray-600">
-              Alt du lurer på om {product.name}
+              Alt du lurer på om {productName}
             </p>
           </div>
 
           <div className="space-y-4">
-            {product.faq.map((faq, index) => (
+            {productConfig.faq.map((faq, index) => (
               <details
                 key={index}
                 className="group rounded-lg border border-gray-200 bg-white p-6 transition-all hover:border-amber-300"
@@ -434,12 +521,12 @@ export default function NightReadingLanding() {
           </div>
 
           <div className="mt-8 text-center">
-            <Link
-              href={product.links.faq}
-              className="inline-block text-amber-600 font-semibold hover:text-amber-700 hover:underline"
-            >
-              Se alle spørsmål →
-            </Link>
+              <Link
+                href={productConfig.links.faq}
+                className="inline-block text-amber-600 font-semibold hover:text-amber-700 hover:underline"
+              >
+                Se alle spørsmål →
+              </Link>
           </div>
         </div>
       </section>
@@ -457,10 +544,10 @@ export default function NightReadingLanding() {
                 30 dagers garanti
               </h3>
               <p className="text-gray-600 mb-4">
-                Vi er sikre på at du vil elske {product.name}. Hvis ikke, kan du returnere produktet innen 30 dager og få full refusjon.
+                Vi er sikre på at du vil elske {productName}. Hvis ikke, kan du returnere produktet innen 30 dager og få full refusjon.
               </p>
               <Link
-                href={product.links.garanti}
+                href={productConfig.links.garanti}
                 className="text-amber-600 font-semibold hover:text-amber-700 hover:underline"
               >
                 Les mer om garantien →
@@ -476,10 +563,10 @@ export default function NightReadingLanding() {
                 Rask levering
               </h3>
               <p className="text-gray-600 mb-4">
-                Fri frakt over 500,-. Ordrene behandles raskt og leveres innen 5–12 virkedager etter ordrebehandling.
+                Fast frakt: 99 kr. Ordrene behandles raskt og leveres innen 5–12 virkedager etter ordrebehandling.
               </p>
               <Link
-                href={product.links.frakt}
+                href={productConfig.links.frakt}
                 className="text-amber-600 font-semibold hover:text-amber-700 hover:underline"
               >
                 Les mer om levering →
@@ -496,13 +583,13 @@ export default function NightReadingLanding() {
             Klar for bedre nattlesing?
           </h2>
           <p className="text-lg sm:text-xl text-amber-100 mb-8">
-            Få {product.name} levert hjem til deg med fri frakt
+            Få {productName} levert hjem til deg
           </p>
           <button
             onClick={handleBuyNow}
             className="inline-flex items-center justify-center px-8 py-4 rounded-full bg-white text-amber-600 font-semibold text-lg hover:bg-amber-50 transition-colors shadow-lg hover:shadow-xl"
           >
-            Kjøp nå – {product.price.display}
+            Kjøp nå – {productPrice},-
           </button>
         </div>
       </section>
@@ -514,7 +601,7 @@ export default function NightReadingLanding() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-gray-600">Kun</p>
-                <p className="text-2xl font-bold text-gray-900">{product.price.display}</p>
+                <p className="text-2xl font-bold text-gray-900">{productPrice},-</p>
               </div>
               <button
                 onClick={handleBuyNow}

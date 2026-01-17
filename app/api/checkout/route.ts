@@ -68,7 +68,8 @@ export async function POST(req: Request) {
 
     // Calculate totals
     const subtotal = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
-    const shippingCost = subtotal >= 500 ? 0 : 99;
+    // Fixed shipping cost: always 99 kr (no free shipping)
+    const shippingCost = 99;
     const tax = 0; // MVA kan legges til senere
     const total = subtotal + shippingCost + tax;
 

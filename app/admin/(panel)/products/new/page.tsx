@@ -65,18 +65,27 @@ export default function NewProductPage() {
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      setError("Filen må være et bilde (jpg, png, webp, etc.)");
-      return;
+    // Validate file types and sizes
+    const fileArray = Array.from(files);
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif", "image/avif"];
+
+    for (const file of fileArray) {
+      if (!allowedTypes.includes(file.type)) {
+        setError(`Filtypen ${file.type} er ikke tillatt. Tillatte typer: jpg, png, webp, gif, avif`);
+        return;
+      }
+      if (file.size > maxSize) {
+        setError(`Bildet ${file.name} er for stort. Maks størrelse: 10MB`);
+        return;
+      }
     }
 
-    // Validate file size (max 4MB)
-    if (file.size > 4 * 1024 * 1024) {
-      setError("Bildet må være mindre enn 4MB");
+    if (fileArray.length > 10) {
+      setError("Maks 10 bilder kan lastes opp samtidig");
       return;
     }
 
@@ -85,25 +94,40 @@ export default function NewProductPage() {
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      fileArray.forEach((file) => {
+        formData.append("files", file);
+      });
 
-      const response = await fetch("/api/upload/image", {
+      const response = await fetch("/api/admin/upload-image", {
         method: "POST",
         body: formData,
       });
 
       const data = await response.json();
 
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Kunne ikke laste opp bilde");
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Kunne ikke laste opp bilder");
       }
 
-      // Add uploaded image URL to images array
-      const updatedImages = [...images, data.url];
-      setImages(updatedImages);
-      setFormData((prev) => ({ ...prev, images: JSON.stringify(updatedImages) }));
+      // Add uploaded image URLs to images array
+      if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
+        const updatedImages = [...images, ...data.urls];
+        setImages(updatedImages);
+        setFormData((prev) => ({ ...prev, images: JSON.stringify(updatedImages) }));
+        
+        // Log for debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[NewProduct] Images updated:', {
+            oldCount: images.length,
+            newCount: updatedImages.length,
+            newUrls: data.urls,
+          });
+        }
+      } else {
+        throw new Error("Ingen URL-er mottatt fra server");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Feil ved opplasting av bilde");
+      setError(err instanceof Error ? err.message : "Feil ved opplasting av bilder");
     } finally {
       setUploading(false);
       // Reset file input
@@ -307,15 +331,16 @@ export default function NewProductPage() {
 
           <div className="space-y-2">
             {/* File upload */}
-            <div className="flex gap-2">
-              <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 hover:bg-slate-50">
-                <ImageIcon size={20} />
-                <span className="text-sm font-medium">
-                  {uploading ? "Laster opp..." : "Last opp bilde"}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-4 transition hover:border-primary hover:bg-slate-100">
+                <ImageIcon size={20} className="text-slate-600" />
+                <span className="text-sm font-medium text-slate-700">
+                  {uploading ? "Laster opp..." : "Last opp bilder fra filer"}
                 </span>
                 <input
                   type="file"
-                  accept="image/*"
+                  multiple
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif"
                   onChange={handleFileUpload}
                   disabled={uploading}
                   className="hidden"
@@ -349,7 +374,7 @@ export default function NewProductPage() {
               </button>
             </div>
             <p className="text-xs text-slate-500">
-              Last opp bilde (max 4MB) eller lim inn bildelenke (URL)
+              Last opp bilder fra filer (maks 10MB per bilde, opptil 10 bilder) eller lim inn bildelenke (URL)
             </p>
           </div>
         </div>

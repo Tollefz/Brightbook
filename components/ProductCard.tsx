@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ShoppingCart, Heart } from 'lucide-react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/cart-context';
 import { cleanProductName } from '@/lib/utils/url-decode';
 import { getCategoryByDbValue } from '@/lib/categories';
@@ -11,12 +12,21 @@ import toast from 'react-hot-toast';
 
 interface ProductCardProps {
   product: any;
+  variants?: Array<{
+    id: string;
+    name: string;
+    attributes?: Record<string, string>;
+    colorCode?: string;
+    stock?: number;
+    sortOrder?: number;
+  }>;
 }
 
-function ProductCard({ product }: ProductCardProps) {
+function ProductCard({ product, variants = [] }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { addToCart } = useCart();
+  const router = useRouter();
 
   // KRITISK: Parse images fra JSON string med error handling
   // Støtter både images (JSON array) og imageUrl (single string)
@@ -70,36 +80,27 @@ function ProductCard({ product }: ProductCardProps) {
   // Clean product name (decode URL-encoded characters)
   const cleanedName = cleanProductName(product.name);
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleBuyNow = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Parse images to get first image
-    let image = '';
-    try {
-      const images = typeof product.images === 'string' 
-        ? JSON.parse(product.images) 
-        : product.images || [];
-      image = images[0] || '';
-    } catch {
-      image = '';
+    // Find default variant: first with stock > 0, or first variant, sorted by sortOrder
+    let defaultVariant = null;
+    if (variants && variants.length > 0) {
+      const sortedVariants = [...variants].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      defaultVariant = sortedVariants.find((v: any) => v.stock > 0) || sortedVariants[0];
     }
     
-    const cartItem = {
-      productId: product.id,
-      name: cleanedName,
-      price: product.price,
-      image: image,
-      quantity: 1,
-      slug: product.slug,
-      variantId: undefined,
-      variantName: undefined,
-    };
+    // Build variant query if variant exists
+    let variantQuery = '';
+    if (defaultVariant) {
+      const color = defaultVariant.attributes?.color || defaultVariant.attributes?.farge || defaultVariant.name?.toLowerCase() || '';
+      const variantSlug = color.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      variantQuery = `?variant=${variantSlug}`;
+    }
     
-    addToCart(cartItem, 1);
-    toast.success(`${cleanedName} lagt i handlekurv!`, {
-      icon: '🛒',
-    });
+    // Navigate to PDP (always, never directly to checkout)
+    router.push(`/products/${product.slug}${variantQuery}`);
   };
 
   // Beregn rabatt
@@ -115,7 +116,7 @@ function ProductCard({ product }: ProductCardProps) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-green-600 hover:shadow-md">
+      <div className="relative flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-premium transition-all duration-300 hover:shadow-premium-hover">
         
         {/* Badges */}
         {(hasDiscount || product.isNew) && (
@@ -126,7 +127,7 @@ function ProductCard({ product }: ProductCardProps) {
               </span>
             )}
             {product.isNew && (
-              <span className="rounded-md bg-green-500 px-2 py-1 text-xs font-bold text-white shadow-sm">
+              <span className="rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-sm">
                 NYHET
               </span>
             )}
@@ -189,8 +190,66 @@ function ProductCard({ product }: ProductCardProps) {
             })()}
           </p>
 
+          {/* VariantDebug - dev only */}
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="absolute top-1 right-1 bg-yellow-100 text-yellow-800 text-[8px] px-1 py-0.5 rounded z-10">
+              V:{variants?.length || 0}
+            </div>
+          )}
+
+          {/* Variant swatches - vises hvis produkt har varianter */}
+          {variants && variants.length > 0 && (() => {
+            // Helper function to get color code from variant name/attributes
+            const getColorCode = (colorName: string): string => {
+              const colorMap: Record<string, string> = {
+                svart: '#1f2937', hvit: '#f9fafb', grå: '#6b7280', rød: '#ef4444',
+                blå: '#3b82f6', grønn: '#10b981', gul: '#fbbf24', rosa: '#ec4894',
+                lilla: '#a855f7', oransje: '#f97316', brun: '#92400e',
+                black: '#1f2937', white: '#f9fafb', gray: '#6b7280', grey: '#6b7280',
+                red: '#ef4444', blue: '#3b82f6', green: '#10b981', yellow: '#fbbf24',
+                pink: '#ec4899', purple: '#a855f7', orange: '#f97316', brown: '#92400e',
+              };
+              const normalized = colorName.toLowerCase().trim();
+              for (const [key, code] of Object.entries(colorMap)) {
+                if (normalized.includes(key)) return code;
+              }
+              return '#94a3b8';
+            };
+
+            return (
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] sm:text-xs text-gray-500">Farger:</span>
+                {variants.slice(0, 3).map((variant) => {
+                  const color = variant.attributes?.color || variant.attributes?.farge || variant.name.toLowerCase();
+                  const colorSlug = color.toLowerCase().replace(/\s+/g, '-');
+                  const colorCode = variant.colorCode || getColorCode(color);
+                  return (
+                    <Link
+                      key={variant.id}
+                      href={`/products/${product.slug}?variant=${colorSlug}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="group/variant relative"
+                      title={`Velg ${variant.name}`}
+                    >
+                      <div
+                        className="h-5 w-5 rounded-full border border-gray-300 shadow-sm transition-all hover:scale-110 hover:border-gray-900 hover:shadow-md"
+                        style={{ backgroundColor: colorCode }}
+                        aria-label={variant.name}
+                      />
+                    </Link>
+                  );
+                })}
+                {variants.length > 3 && (
+                  <span className="text-[10px] sm:text-xs text-gray-500">
+                    +{variants.length - 3}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Produktnavn */}
-          <h3 className="mb-2 line-clamp-2 min-h-[2.5rem] text-sm sm:text-base font-semibold text-gray-900 group-hover:text-green-600 transition-colors">
+          <h3 className="mb-2 line-clamp-2 min-h-[2.5rem] text-sm sm:text-base font-medium text-gray-900 group-hover:text-gray-700 transition-colors">
             {cleanedName}
           </h3>
 
@@ -207,25 +266,25 @@ function ProductCard({ product }: ProductCardProps) {
                 <span className="text-sm text-gray-400 line-through">
                   {Math.floor(product.compareAtPrice).toLocaleString('no-NO')},-
                 </span>
-                <span className="rounded-full bg-green-600 px-2 py-1 text-xs font-semibold text-white">
+                <span className="rounded-full bg-gray-900 px-2 py-1 text-xs font-medium text-white">
                   -{discountPercent}%
                 </span>
               </div>
             )}
           </div>
 
-          {/* Legg i handlekurv knapp */}
+          {/* Kjøp nå knapp - navigerer til PDP, ikke checkout */}
           <button
-            onClick={handleAddToCart}
-            className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 py-2.5 sm:py-3 text-sm font-semibold text-white transition-all hover:bg-green-700 active:scale-[0.98] shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+            onClick={handleBuyNow}
+            className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 py-3 sm:py-3.5 text-sm font-medium text-white transition-all hover:bg-gray-800 active:scale-[0.98] shadow-premium hover:shadow-premium-hover focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
           >
             <ShoppingCart size={16} />
-            <span>Legg i handlekurv</span>
+            <span>Kjøp nå</span>
           </button>
 
           {/* Leveringsinfo - skjul på mobil */}
-          <p className="mt-2 hidden text-center text-xs font-medium text-green-600 sm:block">
-            ✓ Tilgjengelig – 5–12 virkedager
+          <p className="mt-2 hidden text-center text-xs font-medium text-gray-600 sm:block">
+            Tilgjengelig – 5–12 virkedager
           </p>
         </div>
       </div>

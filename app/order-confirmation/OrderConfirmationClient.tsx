@@ -28,6 +28,8 @@ export default function OrderConfirmationClient() {
   const paymentIntentId = searchParams.get('payment_intent');
   const sessionId = searchParams.get('session_id');
   const redirectStatus = searchParams.get('redirect_status');
+  const orderId = searchParams.get('orderId');
+  const isTest = searchParams.get('test') === 'true';
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [emailSent, setEmailSent] = useState(false);
@@ -35,6 +37,24 @@ export default function OrderConfirmationClient() {
 
   useEffect(() => {
     const fetchOrder = async () => {
+      // For test orders, fetch by orderId directly (public endpoint)
+      if (orderId) {
+        try {
+          const response = await fetch(`/api/orders/${orderId}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.ok && data.data) {
+              setOrder(data.data);
+              clearCart();
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching test order:', error);
+        }
+      }
+
       // Try session_id first (Stripe Checkout Session), then payment_intent (Payment Intent)
       if (!sessionId && !paymentIntentId) {
         setLoading(false);
@@ -106,7 +126,7 @@ export default function OrderConfirmationClient() {
     };
 
     fetchOrder();
-  }, [paymentIntentId, redirectStatus, clearCart]);
+  }, [paymentIntentId, sessionId, redirectStatus, orderId, clearCart]);
 
   if (loading) {
     return (
@@ -234,7 +254,14 @@ export default function OrderConfirmationClient() {
                   {items.map((item: any, index: number) => (
                     <div key={index} className="flex justify-between rounded-lg bg-gray-800 border border-green-600/10 p-4">
                       <div>
-                        <p className="font-medium text-white">{item.name}</p>
+                        <p className="font-medium text-white">
+                          {item.name}
+                          {item.variantName && (
+                            <span className="ml-2 text-sm font-normal text-gray-400">
+                              - {item.variantName}
+                            </span>
+                          )}
+                        </p>
                         <p className="text-sm text-gray-300">Antall: {item.quantity}</p>
                       </div>
                       <p className="font-medium text-white">{(item.price * item.quantity).toFixed(0)} kr</p>

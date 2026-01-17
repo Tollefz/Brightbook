@@ -4,6 +4,10 @@ import { getAuthSession } from '@/lib/auth';
 import { improveTitle } from '@/lib/utils/improve-product-title';
 import { safeQuery } from '@/lib/safeQuery';
 import { logError } from '@/lib/utils/logger';
+import { revalidatePath, revalidateTag } from 'next/cache';
+
+// Force dynamic rendering to allow revalidation
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   req: NextRequest,
@@ -16,6 +20,12 @@ export async function GET(
 
   try {
     const { id } = await context.params;
+    
+    // Log query for debugging (dev only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[api/admin/products/[id]] Fetching product with id:', id);
+    }
+    
     const product = await safeQuery(
       () =>
         prisma.product.findUnique({
@@ -29,7 +39,29 @@ export async function GET(
     );
 
     if (!product) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[api/admin/products/[id]] Product not found for id:', id);
+      }
       return NextResponse.json({ ok: false, error: 'Product not found' }, { status: 404 });
+    }
+
+    // Log product data for debugging (dev only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[api/admin/products/[id]] Product found:', {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        compareAtPrice: product.compareAtPrice,
+        supplierPrice: product.supplierPrice,
+        category: product.category,
+        hasDescription: !!product.description,
+        hasShortDescription: !!product.shortDescription,
+        hasImages: !!product.images,
+        hasTags: !!product.tags,
+        stock: product.stock,
+        sku: product.sku,
+        slug: product.slug,
+      });
     }
 
     return NextResponse.json({ ok: true, data: product });
@@ -57,8 +89,9 @@ export async function PATCH(
     const { images, name, ...otherFields } = body;
 
     const updateData: any = { ...otherFields };
-    if (images) {
-      updateData.images = images;
+    if (images !== undefined) {
+      // Handle both string (JSON) and array formats
+      updateData.images = typeof images === "string" ? images : JSON.stringify(images || []);
     }
     
     // Forbedre produkt-tittel automatisk hvis name oppdateres
@@ -69,7 +102,24 @@ export async function PATCH(
     const product = await prisma.product.update({
       where: { id },
       data: updateData,
+      include: {
+        variants: true,
+      },
     });
+
+    // CRITICAL: Revalidate product pages and homepage to show updated variants
+    try {
+      revalidatePath('/');
+      revalidatePath('/products');
+      revalidatePath(`/products/${product.slug}`);
+      revalidateTag('products');
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[revalidate] Revalidated paths for product: ${product.slug}`);
+      }
+    } catch (revalidateError) {
+      // Non-critical: log but don't fail the request
+      console.warn('[revalidate] Failed to revalidate paths:', revalidateError);
+    }
 
     return NextResponse.json({ ok: true, data: product });
   } catch (error) {

@@ -14,6 +14,7 @@ interface Variant {
   image?: string | null;
   attributes: Record<string, string>;
   stock: number;
+  isActive?: boolean;
   slug?: string;
   colorCode?: string;
 }
@@ -35,11 +36,26 @@ export default function ProductVariantSelector({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   
+  // DEBUG: Log when component renders
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[ProductVariantSelector] Rendering with:', {
+      variantsCount: variants?.length || 0,
+      variantsIsArray: Array.isArray(variants),
+      variantIds: variants?.map(v => ({ id: v.id, name: v.name })) || [],
+    });
+  }
+
   // Get initial variant from URL or default - also update when URL changes
+  // Priority: 1) URL param, 2) First variant with stock > 0 AND isActive, 3) First active variant, 4) First variant
   const initialVariantSlug = searchParams.get('variant');
-  const initialVariant = initialVariantSlug 
-    ? variants.find((v) => v.slug === initialVariantSlug) || variants[0]
-    : variants[0];
+  const initialVariantFromUrl = initialVariantSlug 
+    ? variants.find((v) => v.slug === initialVariantSlug)
+    : null;
+  
+  const initialVariant = initialVariantFromUrl 
+    || variants.find((v) => v.stock > 0 && v.isActive !== false) 
+    || variants.find((v) => v.isActive !== false)
+    || variants[0];
 
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
     initialVariant?.id || (variants.length > 0 ? variants[0].id : null)
@@ -123,13 +139,30 @@ export default function ProductVariantSelector({
     return groups;
   }, [variants]);
 
-  if (variants.length === 0) return null;
+  if (!variants || variants.length === 0) {
+    // DEBUG: Log why variants are not showing
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[ProductVariantSelector] No variants provided:', {
+        variants: variants,
+        variantsLength: variants?.length || 0,
+        variantsIsArray: Array.isArray(variants),
+      });
+    }
+    return null;
+  }
 
   return (
     <div className="space-y-3">
-      <label className="text-sm font-semibold text-dark">
-        {variantTypeLabel}: {selectedVariant?.attributes?.color || selectedVariant?.attributes?.farge || selectedVariant?.name.split(' - ')[0] || selectedVariant?.name}
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-semibold text-gray-900">
+          {variantTypeLabel}:
+        </label>
+        {selectedVariant && (
+          <span className="text-xs text-gray-500">
+            Valgt: {selectedVariant.attributes?.color || selectedVariant.attributes?.farge || selectedVariant.name.split(' - ')[0] || selectedVariant.name}
+          </span>
+        )}
+      </div>
       
       <div className="flex flex-wrap gap-3">
         {variants.map((variant) => {
@@ -138,11 +171,24 @@ export default function ProductVariantSelector({
           const variantImage = variant.image || defaultImage;
           const variantLabel = variant.attributes?.color || variant.attributes?.farge || variant.attributes?.størrelse || variant.name.split(' - ')[0] || variant.name;
           
+          // Determine if variant is disabled
+          const isActive = variant.isActive !== false; // Default to true if not set
+          const isOutOfStock = variant.stock <= 0;
+          const isDisabled = !isActive || isOutOfStock;
+          const disabledReason = !isActive ? 'Ikke tilgjengelig' : isOutOfStock ? 'Utsolgt' : null;
+          
           return (
             <button
               key={variant.id}
+              type="button"
               onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
+                
+                // Don't allow selection of disabled variants
+                if (isDisabled) {
+                  return;
+                }
                 
                 // Track user click to prevent URL sync from overriding
                 userClickRef.current = { variantId: variant.id, timestamp: Date.now() };
@@ -160,15 +206,19 @@ export default function ProductVariantSelector({
                   console.log(`[VariantSelector] Image: ${variantImageToUse?.substring(0, 80)}...`);
                 }
               }}
+              disabled={isDisabled}
               className={`group relative flex flex-col items-center rounded-lg border-2 overflow-hidden transition-all ${
-                isSelected
-                  ? 'border-brand ring-2 ring-brand/20 shadow-md'
-                  : 'border-gray-border hover:border-brand hover:shadow-sm'
+                isDisabled
+                  ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                  : isSelected
+                  ? 'border-gray-900 ring-2 ring-gray-900/10 shadow-premium'
+                  : 'border-gray-300 hover:border-gray-900 hover:shadow-sm'
               }`}
-              aria-label={`Velg ${variantLabel}`}
+              aria-label={`Velg ${variantLabel}${disabledReason ? ` (${disabledReason})` : ''}`}
+              title={disabledReason || undefined}
             >
               {/* Variant bilde - unikt for hver variant */}
-              <div className="relative w-24 h-24 bg-gray-light">
+              <div className="relative w-24 h-24 bg-gray-100">
                 {variantImage ? (
                   <Image
                     src={variantImage}
@@ -176,30 +226,47 @@ export default function ProductVariantSelector({
                     fill
                     sizes="96px"
                     className="object-contain p-2"
+                    unoptimized={variantImage.includes('.avif')}
+                    onError={(e) => {
+                      console.warn(`[VariantSelector] Image failed to load: ${variantImage}`);
+                      const target = e.target as HTMLImageElement;
+                      if (target) {
+                        target.style.display = 'none';
+                      }
+                    }}
                   />
                 ) : variant.colorCode ? (
                   // Show color swatch if no image but has color code
                   <div 
-                    className="w-full h-full"
+                    className="w-full h-full rounded"
                     style={{ backgroundColor: variant.colorCode }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                    Ingen bilde
+                    {variantLabel}
                   </div>
                 )}
               </div>
               
               {/* Variant navn */}
               <div className={`w-full px-2 py-1.5 text-xs font-medium text-center transition-colors ${
-                isSelected ? 'bg-brand-light text-brand' : 'bg-white text-dark'
+                isDisabled 
+                  ? 'bg-gray-50 text-gray-400' 
+                  : isSelected 
+                  ? 'bg-gray-50 text-gray-900' 
+                  : 'bg-white text-gray-900'
               }`}>
                 {variantLabel}
+                {disabledReason && (
+                  <span className="block text-[10px] text-red-600 font-medium mt-0.5">
+                    {disabledReason}
+                  </span>
+                )}
               </div>
               
               {/* Selected indicator */}
               {isSelected && (
-                <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-brand border-2 border-white flex items-center justify-center shadow-sm z-10">
+                <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-gray-900 border-2 border-white flex items-center justify-center shadow-sm z-10">
                   <Check size={12} className="text-white" />
                 </div>
               )}
@@ -210,4 +277,3 @@ export default function ProductVariantSelector({
     </div>
   );
 }
-

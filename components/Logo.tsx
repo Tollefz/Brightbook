@@ -100,23 +100,23 @@ export function LogoV4({ className = "" }: { className?: string }) {
   );
 }
 
-// LOGO 5: Monogram med Bok (Elegant)
+// LOGO 5: Monogram med Bok (Elegant) - Premium svart versjon
 export function LogoV5({ className = "" }: { className?: string }) {
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className="relative flex h-12 w-12 items-center justify-center rounded-lg bg-amber-600">
+      <div className="relative flex h-12 w-12 items-center justify-center rounded-lg bg-white border border-gray-200">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-          {/* Bok-ikon */}
+          {/* Bok-ikon - helt svart */}
           <path 
             d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" 
-            stroke="white"
+            stroke="#000000"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path 
             d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" 
-            stroke="white"
+            stroke="#000000"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -125,8 +125,8 @@ export function LogoV5({ className = "" }: { className?: string }) {
         </svg>
       </div>
       <div>
-        <div className="text-lg font-bold text-dark">Book</div>
-        <div className="text-lg font-bold text-amber-600">Bright</div>
+        <div className="text-lg font-bold text-gray-900">Book</div>
+        <div className="text-lg font-bold text-gray-900">Bright</div>
       </div>
     </div>
   );

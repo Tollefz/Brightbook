@@ -23,34 +23,16 @@ export default function FraktPage() {
           </p>
         </div>
 
-        {/* Gratis frakt */}
-        <section className="mb-12 rounded-xl bg-brand-light p-8 text-center">
-          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-brand text-2xl text-white">
-            🎁
-          </div>
-          <h2 className="mb-2 text-3xl font-bold text-dark">Gratis frakt over 500,-</h2>
-          <p className="text-lg text-gray-medium">
-            Bestiller du for mer enn 500,-, er frakten gratis!
-          </p>
-        </section>
-
         {/* Fraktpriser */}
         <section className="mb-12 rounded-xl bg-white p-8 shadow-sm">
           <h2 className="mb-6 text-2xl font-bold text-dark">Fraktpriser</h2>
           <div className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border border-gray-border p-4">
               <div>
-                <h3 className="font-semibold text-dark">Gratis frakt</h3>
-                <p className="text-sm text-gray-medium">For ordre over 500,-</p>
+                <h3 className="font-semibold text-dark">Fast frakt</h3>
+                <p className="text-sm text-gray-medium">For alle ordrer</p>
               </div>
-              <span className="text-2xl font-bold text-brand">0 kr</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-gray-border p-4">
-              <div>
-                <h3 className="font-semibold text-dark">Standard frakt</h3>
-                <p className="text-sm text-gray-medium">For ordre under 500,-</p>
-              </div>
-              <span className="text-2xl font-bold text-dark">79 kr</span>
+              <span className="text-2xl font-bold text-dark">99 kr</span>
             </div>
           </div>
         </section>

@@ -1,6 +1,12 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import { SITE_CONFIG } from '@/lib/site';
+
+export const metadata: Metadata = {
+  title: 'Kontaktinformasjon',
+  description: `Kontakt BookBright på ${SITE_CONFIG.supportEmail} eller ${SITE_CONFIG.supportPhoneDisplay}. Vi svarer innen 24 timer.`,
+};
 
 export default function KontaktPage() {
   return (

@@ -54,7 +54,6 @@ export default function OrderDetailsClient({ order: initialOrder }: OrderDetails
   const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || "");
   const [trackingUrl, setTrackingUrl] = useState(order.trackingUrl || "");
   const [shippingCarrier, setShippingCarrier] = useState(order.shippingCarrier || "");
-  const [supplierStatus, setSupplierStatus] = useState(order.supplierOrderStatus || "PENDING");
   const [sendingSupplier, setSendingSupplier] = useState(false);
   const [retryingEmail, setRetryingEmail] = useState(false);
 
@@ -63,7 +62,6 @@ export default function OrderDetailsClient({ order: initialOrder }: OrderDetails
     setPaymentStatus(order.paymentStatus);
     setTrackingNumber(order.trackingNumber || "");
     setTrackingUrl(order.trackingUrl || "");
-    setSupplierStatus(order.supplierOrderStatus || "PENDING");
   }, [order]);
 
   const handleUpdate = async () => {
@@ -83,7 +81,6 @@ export default function OrderDetailsClient({ order: initialOrder }: OrderDetails
           trackingNumber: trackingNumber.trim() || null,
           trackingUrl: trackingUrl.trim() || null,
           shippingCarrier: shippingCarrier.trim() || null,
-          supplierOrderStatus: supplierStatus, // Internal note only
           notes: notes.trim() || null,
         }),
       });
@@ -93,8 +90,17 @@ export default function OrderDetailsClient({ order: initialOrder }: OrderDetails
         throw new Error(data.error || "Kunne ikke oppdatere ordre");
       }
 
-      const updatedOrder = await response.json();
+      const responseData = await response.json();
+      const updatedOrder = responseData.ok && responseData.data ? responseData.data : responseData;
+      
+      // CRITICAL: Update order state with server response to ensure consistency
       setOrder(updatedOrder);
+      
+      // Sync all state from server response
+      setFulfillmentStatus(updatedOrder.fulfillmentStatus || "NEW");
+      setPaymentStatus(updatedOrder.paymentStatus);
+      setTrackingNumber(updatedOrder.trackingNumber || "");
+      setTrackingUrl(updatedOrder.trackingUrl || "");
       
       // Hvis tracking nummer ble lagt til og det ikke var der før, send shipping notifikasjon
       if (trackingNumber.trim() && trackingNumber.trim() !== order.trackingNumber) {
@@ -129,12 +135,44 @@ export default function OrderDetailsClient({ order: initialOrder }: OrderDetails
       const res = await fetch(`/api/admin/orders/${order.id}/send-to-supplier`, {
         method: "POST",
       });
+      
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Kunne ikke sende til leverandør");
       }
-      setSuccess("Ordre sendt til leverandør (igangsatt)");
-      router.refresh();
+
+      const data = await res.json();
+      
+      if (data.ok && data.data) {
+        setSuccess(
+          `Ordre sendt til leverandør${data.data.supplierOrderRef ? ` (${data.data.supplierOrderRef})` : ""}`
+        );
+      } else {
+        throw new Error(data.error || "Uventet respons fra server");
+      }
+
+      // CRITICAL: Refetch order to ensure we have latest data from DB
+      try {
+        const orderRes = await fetch(`/api/admin/orders/${order.id}`);
+        if (orderRes.ok) {
+          const orderData = await orderRes.json();
+          if (orderData.ok && orderData.data) {
+            setOrder(orderData.data);
+            // Sync all state from server
+            setFulfillmentStatus(orderData.data.fulfillmentStatus || "NEW");
+            setPaymentStatus(orderData.data.paymentStatus);
+            setTrackingNumber(orderData.data.trackingNumber || "");
+            setTrackingUrl(orderData.data.trackingUrl || "");
+          } else {
+            throw new Error("Kunne ikke hente oppdatert ordre");
+          }
+        } else {
+          throw new Error("Kunne ikke hente oppdatert ordre");
+        }
+      } catch (fetchError) {
+        console.error("Could not refetch order:", fetchError);
+        setError("Ordre sendt, men kunne ikke oppdatere visning. Last siden på nytt.");
+      }
     } catch (err: any) {
       setError(err.message || "Kunne ikke sende til leverandør");
     } finally {
@@ -226,28 +264,52 @@ export default function OrderDetailsClient({ order: initialOrder }: OrderDetails
           {/* Quick action buttons */}
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => setFulfillmentStatus("ORDERED_FROM_SUPPLIER")}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700"
+              type="button"
+              onClick={async () => {
+                setFulfillmentStatus("ORDERED_FROM_SUPPLIER");
+                // Immediately save to DB
+                await handleUpdate();
+              }}
+              disabled={loading || fulfillmentStatus === "ORDERED_FROM_SUPPLIER"}
+              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Marker som bestilt
+              {loading && fulfillmentStatus === "ORDERED_FROM_SUPPLIER" ? "Lagrer..." : "Marker som bestilt"}
             </button>
             <button
-              onClick={() => setFulfillmentStatus("SHIPPED")}
-              className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+              type="button"
+              onClick={async () => {
+                setFulfillmentStatus("SHIPPED");
+                // Immediately save to DB
+                await handleUpdate();
+              }}
+              disabled={loading || fulfillmentStatus === "SHIPPED"}
+              className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Marker som sendt
+              {loading && fulfillmentStatus === "SHIPPED" ? "Lagrer..." : "Marker som sendt"}
             </button>
             <button
-              onClick={() => setFulfillmentStatus("DELIVERED")}
-              className="rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700"
+              type="button"
+              onClick={async () => {
+                setFulfillmentStatus("DELIVERED");
+                // Immediately save to DB
+                await handleUpdate();
+              }}
+              disabled={loading || fulfillmentStatus === "DELIVERED"}
+              className="rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Marker som fullført
+              {loading && fulfillmentStatus === "DELIVERED" ? "Lagrer..." : "Marker som fullført"}
             </button>
             <button
-              onClick={() => setFulfillmentStatus("CANCELLED")}
-              className="rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+              type="button"
+              onClick={async () => {
+                setFulfillmentStatus("CANCELLED");
+                // Immediately save to DB
+                await handleUpdate();
+              }}
+              disabled={loading || fulfillmentStatus === "CANCELLED"}
+              className="rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Avbryt ordre
+              {loading && fulfillmentStatus === "CANCELLED" ? "Lagrer..." : "Avbryt ordre"}
             </button>
           </div>
 
@@ -269,46 +331,81 @@ export default function OrderDetailsClient({ order: initialOrder }: OrderDetails
             </select>
           </div>
 
-          {/* Leverandørstatus */}
-          <div className="rounded-lg border border-gray-200 p-3 bg-slate-50">
-            <div className="flex flex-col gap-2">
+          {/* Leverandørstatus - Read-only badge med knapper */}
+          <div className="rounded-lg border border-gray-200 p-4 bg-slate-50">
+            <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Leverandørstatus</p>
-                  <p className="text-sm text-gray-600">
-                    {order.supplierOrderStatus || "PENDING"}{" "}
-                    {order.supplierOrderId ? `• ${order.supplierOrderId}` : ""}
-                  </p>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Leverandørstatus</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Status badge */}
+                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                      order.supplierOrderStatus === "SENT_TO_SUPPLIER" || order.supplierOrderStatus === "ACCEPTED_BY_SUPPLIER"
+                        ? "bg-blue-100 text-blue-800"
+                        : order.supplierOrderStatus === "SHIPPED"
+                        ? "bg-green-100 text-green-800"
+                        : order.supplierOrderStatus === "DELIVERED"
+                        ? "bg-purple-100 text-purple-800"
+                        : order.supplierOrderStatus === "CANCELLED"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}>
+                      {order.supplierOrderStatus || "PENDING"}
+                    </span>
+                    
+                    {/* Supplier order reference */}
+                    {order.supplierOrderId && (
+                      <span className="text-xs text-gray-600">
+                        Ref: {order.supplierOrderId}
+                      </span>
+                    )}
+                    
+                    {/* Supplier sent at */}
+                    {order.updatedAt && (order.supplierOrderStatus === "SENT_TO_SUPPLIER" || order.supplierOrderStatus === "ACCEPTED_BY_SUPPLIER") && (
+                      <span className="text-xs text-gray-500">
+                        Sendt: {new Date(order.updatedAt).toLocaleString('no-NO', { 
+                          day: '2-digit', 
+                          month: '2-digit', 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Error message */}
                   {order.autoOrderError && (
-                    <p className="text-xs text-red-600 mt-1">Feil: {order.autoOrderError}</p>
+                    <p className="text-xs text-red-600 mt-2">
+                      ⚠️ Feil: {order.autoOrderError}
+                    </p>
                   )}
                 </div>
+                
+                {/* Action button */}
                 <button
                   onClick={handleSendToSupplier}
-                  disabled={sendingSupplier}
-                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={sendingSupplier || order.supplierOrderStatus === "SENT_TO_SUPPLIER"}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   {sendingSupplier ? "Sender..." : "Send ordre til leverandør"}
                 </button>
               </div>
-              <div>
-                <label htmlFor="supplierStatus" className="block text-sm font-medium text-gray-700 mb-1">
-                  Sett leverandørstatus
-                </label>
-                <select
-                  id="supplierStatus"
-                  value={supplierStatus}
-                  onChange={(e) => setSupplierStatus(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="PENDING">PENDING</option>
-                  <option value="SENT_TO_SUPPLIER">SENT_TO_SUPPLIER</option>
-                  <option value="ACCEPTED_BY_SUPPLIER">ACCEPTED_BY_SUPPLIER</option>
-                  <option value="SHIPPED">SHIPPED</option>
-                  <option value="DELIVERED">DELIVERED</option>
-                  <option value="CANCELLED">CANCELLED</option>
-                </select>
-              </div>
+              
+              {/* Debug info (dev only) */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-2 rounded-lg border border-gray-300 bg-gray-50 p-2 text-xs">
+                  <p className="font-semibold text-gray-700 mb-1">Debug:</p>
+                  <div className="space-y-0.5 text-gray-600">
+                    <p>Status: <code className="bg-white px-1 rounded">{order.supplierOrderStatus || "PENDING"}</code></p>
+                    {order.supplierOrderId && (
+                      <p>Order ID: <code className="bg-white px-1 rounded">{order.supplierOrderId}</code></p>
+                    )}
+                    {order.updatedAt && (
+                      <p>Oppdatert: <code className="bg-white px-1 rounded">{new Date(order.updatedAt).toLocaleString('no-NO')}</code></p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

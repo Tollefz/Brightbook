@@ -21,8 +21,8 @@ export async function generateMetadata({ searchParams }: ProductsPageProps): Pro
   const categoryName = categoryDef?.label;
   const title = categoryName ? `${categoryName} - BookBright` : "Produkter - BookBright";
   const description = categoryName 
-    ? `Utforsk vårt utvalg av ${categoryName.toLowerCase()}. Gratis frakt over 500 kr. Rask levering i hele Norge.`
-    : "Utforsk vårt utvalg av elektronikk, gaming-utstyr, mobil og tilbehør. Gratis frakt over 500 kr.";
+    ? `Utforsk vårt utvalg av ${categoryName.toLowerCase()}. Fast frakt: 99 kr. Rask levering i hele Norge.`
+    : "Utforsk vårt utvalg av elektronikk, gaming-utstyr, mobil og tilbehør. Fast frakt: 99 kr.";
   
   return {
     title,
@@ -150,6 +150,20 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           images: true,
           category: true,
           isActive: true,
+          variants: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              name: true,
+              attributes: true,
+              image: true,
+              price: true,
+              stock: true,
+              sortOrder: true,
+            },
+            orderBy: { sortOrder: 'asc' },
+            take: 5, // Limit to 5 for preview
+          },
         },
       }),
       prisma.product.count({ where }),
@@ -325,14 +339,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Link
                     href="/products"
-                    className="inline-block rounded-lg bg-green-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
+                    className="inline-block rounded-lg bg-gray-900 px-6 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
                   >
                     Se alle produkter
                   </Link>
                   {resolvedCategoryName && (
                     <Link
                       href="/tilbud"
-                      className="inline-block rounded-lg border-2 border-green-600 px-6 py-2.5 text-sm font-semibold text-green-600 hover:bg-green-50 transition-colors"
+                      className="inline-block rounded-lg border border-gray-900 px-6 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
                     >
                       Se tilbud
                     </Link>
@@ -342,7 +356,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard 
+                    key={product.id} 
+                    product={product} 
+                    variants={product.variants || []}
+                  />
                 ))}
               </div>
             )}

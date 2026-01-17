@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthSession } from "@/lib/auth";
 import { validateVariantAttributes } from "@/lib/validation/color-validation";
+import { revalidatePath, revalidateTag } from 'next/cache';
+
+// Force dynamic rendering to allow revalidation
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   req: Request,
@@ -17,7 +21,10 @@ export async function GET(
 
     const variants = await prisma.productVariant.findMany({
       where: { productId: id },
-      orderBy: { createdAt: "asc" },
+      orderBy: [
+        { sortOrder: 'asc' },
+        { createdAt: "asc" },
+      ],
     });
 
     return NextResponse.json({ variants });
@@ -73,7 +80,28 @@ export async function POST(
         stock: variantData.stock || 10,
         isActive: variantData.isActive !== undefined ? variantData.isActive : true,
       },
+      include: {
+        product: {
+          select: { slug: true },
+        },
+      },
     });
+
+    // CRITICAL: Revalidate product pages and homepage to show new variant
+    try {
+      revalidatePath('/');
+      revalidatePath('/products');
+      if (variant.product?.slug) {
+        revalidatePath(`/products/${variant.product.slug}`);
+      }
+      revalidateTag('products');
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[revalidate] Revalidated paths after creating variant: ${variant.name}`);
+      }
+    } catch (revalidateError) {
+      // Non-critical: log but don't fail the request
+      console.warn('[revalidate] Failed to revalidate paths:', revalidateError);
+    }
 
     return NextResponse.json(variant, { status: 201 });
   } catch (error) {
@@ -121,9 +149,15 @@ export async function PUT(
       };
     });
 
+    // Get product slug for revalidation
+    const product = await prisma.product.findUnique({
+      where: { id },
+      select: { slug: true },
+    });
+
     // Opprett nye varianter
     const createdVariants = await Promise.all(
-      validatedVariants.map((variant: any) =>
+      validatedVariants.map((variant: any, index: number) =>
         prisma.productVariant.create({
           data: {
             productId: id,
@@ -135,10 +169,27 @@ export async function PUT(
             attributes: variant.attributes || {},
             stock: variant.stock || 0,
             isActive: variant.isActive !== undefined ? variant.isActive : true,
+            sortOrder: variant.sortOrder !== undefined ? Number(variant.sortOrder) : index,
           },
         })
       )
     );
+
+    // CRITICAL: Revalidate product pages and homepage to show updated variants
+    try {
+      revalidatePath('/');
+      revalidatePath('/products');
+      if (product?.slug) {
+        revalidatePath(`/products/${product.slug}`);
+      }
+      revalidateTag('products');
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[revalidate] Revalidated paths after updating variants for product: ${product?.slug || id}`);
+      }
+    } catch (revalidateError) {
+      // Non-critical: log but don't fail the request
+      console.warn('[revalidate] Failed to revalidate paths:', revalidateError);
+    }
 
     return NextResponse.json({ variants: createdVariants });
   } catch (error) {

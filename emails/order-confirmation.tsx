@@ -88,7 +88,7 @@ export default function OrderConfirmationEmail({
               <Column><Text style={styles.text}>Frakt:</Text></Column>
               <Column align="right">
                 <Text style={styles.text}>
-                  {shippingCost === 0 ? 'Gratis' : `${shippingCost} kr`}
+                  {shippingCost || 99} kr
                 </Text>
               </Column>
             </Row>

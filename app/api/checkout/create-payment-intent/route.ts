@@ -174,7 +174,7 @@ export async function POST(req: Request) {
           address: customer.address || customer.address1,
           zip: customer.zip || customer.zipCode,
           city: customer.city,
-          shippingMethod: shippingCost === 0 ? "Gratis" : "Standard",
+          shippingMethod: "Standard",
         }),
         paymentMethod: PaymentMethod.stripe, // PaymentMethod enum: stripe, vipps, klarna, paypal
         paymentStatus: PaymentStatus.pending,
@@ -204,9 +204,12 @@ export async function POST(req: Request) {
 
     // Opprett Stripe PaymentIntent
     const amountCents = Math.round((total - discountAmount) * 100);
+    // Get currency from env or default to NOK
+    const currency = (process.env.STRIPE_CURRENCY || "nok").toLowerCase();
+    
     console.log("💳 Creating Stripe PaymentIntent with:", {
       amount: amountCents,
-      currency: "nok",
+      currency: currency,
       orderNumber: order.orderNumber,
       discountAmount,
       discountCode: appliedDiscountCode,
@@ -216,7 +219,7 @@ export async function POST(req: Request) {
     try {
       paymentIntent = await stripe.paymentIntents.create({
         amount: amountCents, // Konverter til øre
-        currency: "nok",
+        currency: currency,
         metadata: {
           orderId: order.id,
           orderNumber: order.orderNumber,

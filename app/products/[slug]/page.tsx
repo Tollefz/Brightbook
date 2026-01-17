@@ -7,6 +7,7 @@ import ProductVariantSelector from '@/components/ProductVariantSelector';
 import AddToCartButton from '@/components/AddToCartButton';
 import ProductCard from '@/components/ProductCard';
 import ProductTabs from '@/components/ProductTabs';
+import ProductPriceDisplay from '@/components/ProductPriceDisplay';
 import { Truck, Shield, RotateCcw, Check } from 'lucide-react';
 import { cleanProductName } from '@/lib/utils/url-decode';
 import { getStoreIdFromHeadersServer } from '@/lib/store-server';
@@ -135,8 +136,11 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
         },
         include: {
           variants: {
-            where: { isActive: true },
-            orderBy: { price: 'asc' },
+            // CRITICAL: Don't filter by isActive - show all variants, mark inactive as disabled in UI
+            orderBy: [
+              { sortOrder: 'asc' },
+              { price: 'asc' },
+            ],
           },
         },
       }),
@@ -157,7 +161,10 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
           include: {
             variants: {
               where: { isActive: true },
-              orderBy: { price: 'asc' },
+              orderBy: [
+                { sortOrder: 'asc' },
+                { price: 'asc' },
+              ],
             },
           },
         }),
@@ -180,7 +187,10 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
           include: {
             variants: {
               where: { isActive: true },
-              orderBy: { price: 'asc' },
+              orderBy: [
+                { sortOrder: 'asc' },
+                { price: 'asc' },
+              ],
             },
           },
         }),
@@ -201,7 +211,10 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
           include: {
             variants: {
               where: { isActive: true },
-              orderBy: { price: 'asc' },
+              orderBy: [
+                { sortOrder: 'asc' },
+                { price: 'asc' },
+              ],
             },
           },
         }),
@@ -223,13 +236,13 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 href="/products"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
               >
                 Se alle produkter
               </Link>
               <Link
                 href="/tilbud"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border-2 border-green-600 px-6 py-3 text-sm font-semibold text-green-600 hover:bg-green-50 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-900 px-6 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
               >
                 Se tilbud
               </Link>
@@ -258,6 +271,20 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
           compareAtPrice: true,
           images: true,
           category: true,
+          variants: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              name: true,
+              attributes: true,
+              image: true,
+              price: true,
+              stock: true,
+              sortOrder: true,
+            },
+            orderBy: { sortOrder: 'asc' },
+            take: 5, // Limit to 5 for preview
+          },
         },
         take: 20, // Get more to randomize from
       });
@@ -393,8 +420,30 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
   // Track used images to ensure uniqueness
   const usedImages = new Set<string>();
   
+  // DEBUG: Log variants to ensure they're loaded
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[ProductPage] Product variants from DB:', {
+      productId: product.id,
+      productName: product.name,
+      variantsExists: !!product.variants,
+      variantsIsArray: Array.isArray(product.variants),
+      count: product.variants?.length || 0,
+      variants: product.variants?.map(v => ({
+        id: v.id,
+        name: v.name,
+        price: v.price,
+        isActive: v.isActive,
+        image: v.image,
+        stock: v.stock,
+      })) || [],
+    });
+  }
+
   // Map variants with proper images and color codes
-  const variants: VariantDisplay[] = product.variants.map((v, index) => {
+  // CRITICAL: Ensure product.variants exists and is an array
+  // IMPORTANT: Include ALL variants (even inactive/out of stock) - UI will mark them as disabled
+  const productVariants = product.variants || [];
+  const variants: VariantDisplay[] = productVariants.map((v, index) => {
     const attrs = (v.attributes as Record<string, string>) || {};
     const color = attrs.color || attrs.farge || v.name.toLowerCase();
     const colorSlug = color.toLowerCase().replace(/\s+/g, '-');
@@ -454,14 +503,19 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
       image: variantImage,
       attributes: attrs,
       stock: v.stock,
+      isActive: v.isActive !== false, // Default to true if not set
       colorCode: getColorCode(color),
       slug: colorSlug,
     };
   });
 
   // Determine active variant from URL parameter
-  const activeVariantSlug = variantParam || variants[0]?.slug;
-  const activeVariant = variants.find((v) => v.slug === activeVariantSlug) || variants[0];
+  // Priority: 1) first variant with stock > 0 AND isActive === true, 2) first active variant, 3) first variant
+  const defaultVariant = variants.find(v => v.stock > 0 && v.isActive) 
+    || variants.find(v => v.isActive) 
+    || variants[0];
+  const activeVariantSlug = variantParam || defaultVariant?.slug;
+  const activeVariant = variants.find((v) => v.slug === activeVariantSlug) || defaultVariant;
 
   // Reorder images to show active variant first
   // CRITICAL: Ensure variant image is included in images array
@@ -547,13 +601,13 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
         
         {/* Breadcrumbs */}
         <nav className="mb-4 sm:mb-6 flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-600 overflow-x-auto">
-          <Link href="/" className="hover:text-green-600 transition-colors whitespace-nowrap">Hjem</Link>
+          <Link href="/" className="hover:text-gray-900 transition-colors whitespace-nowrap">Hjem</Link>
           <span>/</span>
-          <Link href="/products" className="hover:text-green-600 transition-colors whitespace-nowrap">Produkter</Link>
+          <Link href="/products" className="hover:text-gray-900 transition-colors whitespace-nowrap">Produkter</Link>
           <span>/</span>
           {product.category && (
             <>
-              <Link href={`/products?category=${product.category}`} className="hover:text-green-600 transition-colors whitespace-nowrap">
+              <Link href={`/products?category=${product.category}`} className="hover:text-gray-900 transition-colors whitespace-nowrap">
                 {product.category}
               </Link>
               <span>/</span>
@@ -579,7 +633,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
                     SPAR {discountPercent}%
                   </span>
                 )}
-                <span className="rounded-md bg-green-100 px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-green-700">
+                <span className="rounded-md bg-gray-100 px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-medium text-gray-700">
                   Tilgjengelig
                 </span>
               </div>
@@ -594,25 +648,12 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
                 {cleanedName}
               </h1>
 
-              {/* Pris */}
-              <div className="mb-4 sm:mb-6 rounded-lg bg-gray-50 p-3 sm:p-4">
-                <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
-                  <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
-                    {Math.floor(product.price).toLocaleString('no-NO')},-
-                  </span>
-                  {hasDiscount && (
-                    <span className="text-lg sm:text-xl text-gray-500 line-through">
-                      {Math.floor(product.compareAtPrice!).toLocaleString('no-NO')},-
-                    </span>
-                  )}
-                </div>
-                {hasDiscount && (
-                  <p className="mt-1 text-xs sm:text-sm font-semibold text-red-600">
-                    Du sparer {Math.floor(product.compareAtPrice! - product.price).toLocaleString('no-NO')},-
-                  </p>
-                )}
-                <p className="mt-2 text-xs text-gray-500">Inkl. mva</p>
-              </div>
+              {/* Pris - dynamisk basert på valgt variant */}
+              <ProductPriceDisplay
+                basePrice={Number(product.price)}
+                baseCompareAtPrice={product.compareAtPrice ? Number(product.compareAtPrice) : null}
+                variants={variants}
+              />
 
               {/* Kort beskrivelse */}
               <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 leading-relaxed">
@@ -620,20 +661,63 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
               </p>
 
               {/* Variant selector - vises før AddToCartButton */}
-              {variants.length > 0 && (
-                <div className="mb-4 sm:mb-6">
-                  <Suspense fallback={<div className="h-20 w-full rounded-lg bg-gray-200 animate-pulse" />}>
-                    <ProductVariantSelector
-                      variants={variants}
-                      defaultImage={productData.image}
-                      variantTypeLabel="Farge"
-                    />
-                  </Suspense>
-                </div>
-              )}
+              {(() => {
+                // DEBUG: Log variant state
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[ProductPage] Variant check:', {
+                    productVariantsLength: product.variants?.length || 0,
+                    mappedVariantsLength: variants.length,
+                    hasVariants: variants.length > 0,
+                    variants: variants.map(v => ({ id: v.id, name: v.name, isActive: true })),
+                  });
+                }
+                
+                if (variants.length > 0) {
+                  return (
+                    <div className="mb-4 sm:mb-6">
+                      <div className="mb-2">
+                        <label className="text-sm font-semibold text-gray-900">Velg farge:</label>
+                      </div>
+                      <Suspense fallback={<div className="h-20 w-full rounded-lg bg-gray-200 animate-pulse" />}>
+                        <ProductVariantSelector
+                          variants={variants}
+                          defaultImage={productData.image}
+                          variantTypeLabel="Farge"
+                        />
+                      </Suspense>
+                    </div>
+                  );
+                } else {
+                  // Always show debug message in dev, or a subtle message in prod
+                  return (
+                    <div className={`mb-4 rounded-lg border p-3 text-xs ${
+                      process.env.NODE_ENV === 'development' 
+                        ? 'bg-yellow-50 border-yellow-200 text-yellow-700' 
+                        : 'bg-gray-50 border-gray-200 text-gray-600'
+                    }`}>
+                      {process.env.NODE_ENV === 'development' ? (
+                        <>
+                          ⚠️ Ingen varianter funnet. Sjekk at varianter er lagt til i admin og at isActive=true.
+                          <br />
+                          <span className="text-gray-600">
+                            Product.variants.length: {product.variants?.length || 0}, 
+                            Mapped variants.length: {variants.length}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-gray-500">Ingen varianter tilgjengelig</span>
+                      )}
+                    </div>
+                  );
+                }
+              })()}
 
-              {/* Add to cart */}
-              <AddToCartButton product={productData} variants={variants} />
+              {/* Add to cart - only show if no variants OR variant is selected */}
+              <AddToCartButton 
+                product={productData} 
+                variants={variants}
+                requireVariantSelection={variants.length > 0}
+              />
 
               {/* Manuell oppfyllelse info */}
               <div className="mt-4 rounded-lg bg-blue-50 border border-blue-200 p-3 sm:p-4">
@@ -647,28 +731,28 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
               {/* USPs */}
               <div className="mt-4 sm:mt-6 grid grid-cols-2 gap-2 sm:gap-4">
                 <div className="flex items-center gap-2 sm:gap-3 rounded-lg border border-gray-200 p-2 sm:p-3">
-                  <Truck className="text-green-600 flex-shrink-0" size={20} />
+                  <Truck className="text-gray-700 flex-shrink-0" size={20} />
                   <div>
-                    <p className="text-xs sm:text-sm font-semibold text-gray-900">Fri frakt</p>
-                    <p className="text-[10px] sm:text-xs text-gray-600">Over 500,-</p>
+                    <p className="text-xs sm:text-sm font-semibold text-gray-900">Fast frakt</p>
+                    <p className="text-[10px] sm:text-xs text-gray-600">99 kr</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 rounded-lg border border-gray-200 p-2 sm:p-3">
-                  <RotateCcw className="text-green-600 flex-shrink-0" size={20} />
+                  <RotateCcw className="text-gray-700 flex-shrink-0" size={20} />
                   <div>
                     <p className="text-xs sm:text-sm font-semibold text-gray-900">30 dagers</p>
                     <p className="text-[10px] sm:text-xs text-gray-600">Åpent kjøp</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 rounded-lg border border-gray-200 p-2 sm:p-3">
-                  <Shield className="text-green-600 flex-shrink-0" size={20} />
+                  <Shield className="text-gray-700 flex-shrink-0" size={20} />
                   <div>
                     <p className="text-xs sm:text-sm font-semibold text-gray-900">2 års garanti</p>
                     <p className="text-[10px] sm:text-xs text-gray-600">Full dekning</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 rounded-lg border border-gray-200 p-2 sm:p-3">
-                  <Check className="text-green-600 flex-shrink-0" size={20} />
+                  <Check className="text-gray-700 flex-shrink-0" size={20} />
                   <div>
                     <p className="text-xs sm:text-sm font-semibold text-gray-900">Tilgjengelig</p>
                     <p className="text-[10px] sm:text-xs text-gray-600">5–12 virkedager</p>

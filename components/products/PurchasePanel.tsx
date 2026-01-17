@@ -213,7 +213,7 @@ export function PurchasePanel({ product, variants = [] }: PurchasePanelProps) {
         </Button>
       </div>
       <ul className="space-y-1 text-sm text-secondary">
-        <li>✅ Gratis frakt over 500 kr</li>
+        <li>✅ Fast frakt: 99 kr</li>
         <li>✅ 30 dagers returrett</li>
         <li>✅ Trygg betaling</li>
       </ul>

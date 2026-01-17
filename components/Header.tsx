@@ -24,18 +24,16 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm">
-      {/* Øverste linje - grønn */}
-      <div className="bg-green-600">
+      {/* Øverste linje - subtil */}
+      <div className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-1.5 text-[10px] sm:text-xs text-white">
+          <div className="flex items-center justify-between py-2 text-[10px] sm:text-xs text-gray-600">
             <div className="flex items-center gap-2 sm:gap-4">
-              <span className="whitespace-nowrap">Fri frakt over {SITE_CONFIG.freeShippingThreshold},-</span>
-              <span className="hidden sm:inline">|</span>
               <span className="hidden sm:inline whitespace-nowrap">{SITE_CONFIG.deliveryPromise}</span>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <Link href="/kundeservice" className="hover:underline whitespace-nowrap text-[10px] sm:text-xs">Kundeservice</Link>
-              <Link href="/admin/login" className="hover:underline whitespace-nowrap text-[10px] sm:text-xs">For bedrift</Link>
+              <Link href="/kundeservice" className="hover:text-gray-900 transition-colors whitespace-nowrap text-[10px] sm:text-xs">Kundeservice</Link>
+              <Link href="/admin/login" className="hover:text-gray-900 transition-colors whitespace-nowrap text-[10px] sm:text-xs">For bedrift</Link>
             </div>
           </div>
         </div>
@@ -67,7 +65,7 @@ export function Header() {
             >
               <ShoppingCart size={22} className="text-gray-700" />
               {mounted && itemCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">
                   {itemCount}
                 </span>
               )}
@@ -92,12 +90,12 @@ export function Header() {
                   placeholder="Søk blant produkter..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border-2 border-gray-300 bg-white py-2.5 pl-4 pr-12 text-sm focus:border-brand focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-4 pr-12 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
                   autoFocus
                 />
                 <button
                   type="submit"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-brand p-2 text-white hover:bg-brand-dark transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-gray-900 p-2 text-white hover:bg-gray-800 transition-colors"
                 >
                   <Search size={18} />
                 </button>
@@ -128,11 +126,11 @@ export function Header() {
                   placeholder="Søk blant produkter..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border-2 border-gray-300 bg-white py-2.5 pl-5 pr-14 text-sm focus:border-brand focus:outline-none transition-colors"
+                  className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-5 pr-14 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 transition-colors"
                 />
                 <button
                   type="submit"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-brand p-2.5 text-white hover:bg-brand-dark transition-colors"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-gray-900 p-2.5 text-white hover:bg-gray-800 transition-colors"
                 >
                   <Search size={18} />
                 </button>
@@ -158,7 +156,7 @@ export function Header() {
                 <div className="relative">
                   <ShoppingCart size={20} className="text-gray-700" />
                   {mounted && itemCount > 0 && (
-                    <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+                    <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">
                       {itemCount}
                     </span>
                   )}

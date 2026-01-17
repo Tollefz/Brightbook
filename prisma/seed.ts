@@ -1,6 +1,47 @@
-import { PrismaClient, SupplierName } from "@prisma/client";
+import { PrismaClient, SupplierName, UserRole } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+/**
+ * Ensure admin user exists in database
+ * Reads password from ADMIN_PASSWORD env var, or uses fallback (must be changed)
+ */
+async function ensureAdminUser() {
+  const adminEmail = "rob.tol@hotmail.com";
+  
+  // Read password from env, or use fallback (MUST be changed if using fallback)
+  const adminPassword = process.env.ADMIN_PASSWORD || "VELG_ET_PASSORD_HER";
+  
+  if (adminPassword === "VELG_ET_PASSORD_HER") {
+    console.warn("⚠️  WARNING: Using fallback password. Set ADMIN_PASSWORD env var or change password in seed.ts");
+  }
+
+  // Check if admin user already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email: adminEmail },
+  });
+
+  if (existingUser) {
+    console.log("✅ Admin user already exists");
+    return;
+  }
+
+  // Hash password with bcryptjs (10 rounds)
+  const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+  // Create admin user with UserRole enum
+  await prisma.user.create({
+    data: {
+      email: adminEmail,
+      password: hashedPassword,
+      name: "Admin",
+      role: UserRole.admin, // Use enum value from Prisma
+    },
+  });
+
+  console.log("✅ Admin user created");
+}
 
 type SeedProduct = {
   name: string;
@@ -150,41 +191,43 @@ async function main() {
 
   if (existingDemoProducts > 0) {
     console.log(`⚠️  Demo products already exist (${existingDemoProducts} products with storeId="${demoStoreId}")`);
-    console.log("   Skipping seed to preserve existing data.");
+    console.log("   Skipping demo product creation to preserve existing data.");
     console.log("   To re-seed demo products, delete them first or change demoStoreId.");
-    return;
+  } else {
+    // Only create demo products if they don't exist
+    console.log(`📦 Creating demo products with storeId="${demoStoreId}"...`);
+
+    for (const product of products) {
+      const supplierPrice = Number((product.price * 0.65).toFixed(2));
+      await prisma.product.create({
+        data: {
+          name: product.name,
+          slug: toSlug(product.name),
+          shortDescription: product.shortDescription,
+          description: product.description,
+          price: product.price,
+          compareAtPrice: product.compareAtPrice,
+          supplierPrice,
+          images: JSON.stringify([imageUrl(product.name)]),
+          tags: JSON.stringify([product.category.toLowerCase(), "nyhet"]),
+          category: product.category,
+          isActive: true,
+          storeId: demoStoreId, // Use demo-store instead of default-store
+          supplierUrl: "https://alibaba.com/product/example",
+          supplierName: SupplierName.alibaba,
+          supplierProductId: supplierId(),
+          stock: 100,
+          profitMargin: "35%",
+        },
+      });
+    }
+
+    console.log(`✅ Seed completed with ${products.length} demo products (storeId="${demoStoreId}")`);
+    console.log("   NOTE: Demo products will NOT appear on /products unless storeId is set to 'demo-store'");
   }
-
-  // Only create demo products if they don't exist
-  console.log(`📦 Creating demo products with storeId="${demoStoreId}"...`);
-
-  for (const product of products) {
-    const supplierPrice = Number((product.price * 0.65).toFixed(2));
-    await prisma.product.create({
-      data: {
-        name: product.name,
-        slug: toSlug(product.name),
-        shortDescription: product.shortDescription,
-        description: product.description,
-        price: product.price,
-        compareAtPrice: product.compareAtPrice,
-        supplierPrice,
-        images: JSON.stringify([imageUrl(product.name)]),
-        tags: JSON.stringify([product.category.toLowerCase(), "nyhet"]),
-        category: product.category,
-        isActive: true,
-        storeId: demoStoreId, // Use demo-store instead of default-store
-        supplierUrl: "https://alibaba.com/product/example",
-        supplierName: SupplierName.alibaba,
-        supplierProductId: supplierId(),
-        stock: 100,
-        profitMargin: "35%",
-      },
-    });
-  }
-
-  console.log(`✅ Seed completed with ${products.length} demo products (storeId="${demoStoreId}")`);
-  console.log("   NOTE: Demo products will NOT appear on /products unless storeId is set to 'demo-store'");
+  
+  // Ensure admin user exists (always run, even if demo products were skipped)
+  await ensureAdminUser();
 }
 
 main()

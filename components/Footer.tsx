@@ -4,7 +4,7 @@ import { SITE_CONFIG } from '@/lib/site';
 
 export function Footer() {
   return (
-    <footer className="bg-[#F3F4F6]">
+    <footer className="bg-white border-t border-gray-200">
       {/* Hovedfooter */}
       <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-12 sm:py-10">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
@@ -15,34 +15,35 @@ export function Footer() {
               Kundeservice
             </h3>
             <ul className="space-y-2 text-sm text-gray-700">
-              <li><Link href="/kontakt" className="hover:text-green-600 transition-colors">Kontakt oss</Link></li>
-              <li><Link href="/faq" className="hover:text-green-600 transition-colors">Ofte stilte spørsmål</Link></li>
-              <li><Link href="/retur" className="hover:text-green-600 transition-colors">Retur & Bytte</Link></li>
-              <li><Link href="/frakt" className="hover:text-green-600 transition-colors">Frakt & Levering</Link></li>
-              <li><Link href="/garanti" className="hover:text-green-600 transition-colors">Garanti</Link></li>
+              <li><Link href="/kontakt" className="hover:text-gray-900 transition-colors">Kontakt oss</Link></li>
+              <li><Link href="/faq" className="hover:text-gray-900 transition-colors">Ofte stilte spørsmål</Link></li>
+              <li><Link href="/retur" className="hover:text-gray-900 transition-colors">Retur & Bytte</Link></li>
+              <li><Link href="/frakt" className="hover:text-gray-900 transition-colors">Frakt & Levering</Link></li>
+              <li><Link href="/garanti" className="hover:text-gray-900 transition-colors">Garanti</Link></li>
             </ul>
             <div className="mt-4 space-y-3 text-sm">
-              <a href={`mailto:${SITE_CONFIG.supportEmail}`} className="flex items-center gap-2 text-gray-700 hover:text-green-600 transition-colors">
+              <a href={`mailto:${SITE_CONFIG.supportEmail}`} className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors">
                 <Mail size={16} className="flex-shrink-0" />
                 <span className="break-all">{SITE_CONFIG.supportEmail}</span>
               </a>
-              <a href={`tel:${SITE_CONFIG.supportPhoneTel}`} className="flex items-center gap-2 text-gray-700 hover:text-green-600 transition-colors">
+              <a href={`tel:${SITE_CONFIG.supportPhoneTel}`} className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors">
                 <Phone size={16} className="flex-shrink-0" />
                 <span>{SITE_CONFIG.supportPhoneDisplay}</span>
               </a>
             </div>
           </div>
 
-          {/* 2. Informasjon */}
+          {/* 2. Juridisk */}
           <div>
             <h3 className="mb-4 text-base font-semibold text-gray-900">
-              Informasjon
+              Juridisk
             </h3>
             <ul className="space-y-2 text-sm text-gray-700">
-              <li><Link href="/personvern" className="hover:text-green-600 transition-colors">Personvern</Link></li>
-              <li><Link href="/cookies" className="hover:text-green-600 transition-colors">Cookies</Link></li>
-              <li><Link href="/vilkar" className="hover:text-green-600 transition-colors">Vilkår</Link></li>
-              <li><Link href="/kundeservice" className="hover:text-green-600 transition-colors">Kundeservice</Link></li>
+              <li><Link href="/personvern" className="hover:text-gray-900 transition-colors">Personvernerklæring</Link></li>
+              <li><Link href="/vilkar" className="hover:text-gray-900 transition-colors">Kjøpsvilkår</Link></li>
+              <li><Link href="/retur" className="hover:text-gray-900 transition-colors">Angrerett og retur</Link></li>
+              <li><Link href="/kontakt" className="hover:text-gray-900 transition-colors">Kontaktinformasjon</Link></li>
+              <li><Link href="/cookies" className="hover:text-gray-900 transition-colors">Cookies</Link></li>
             </ul>
           </div>
 
@@ -52,23 +53,40 @@ export function Footer() {
               Kategorier
             </h3>
             <ul className="space-y-2 text-sm text-gray-700">
-              <li><Link href="/products?category=data" className="hover:text-green-600 transition-colors">Data & IT</Link></li>
-              <li><Link href="/products?category=gaming" className="hover:text-green-600 transition-colors">Gaming</Link></li>
-              <li><Link href="/products?category=mobil" className="hover:text-green-600 transition-colors">Mobil & Tilbehør</Link></li>
-              <li><Link href="/products?category=tv" className="hover:text-green-600 transition-colors">TV, Lyd & Bilde</Link></li>
-              <li><Link href="/products" className="hover:text-green-600 transition-colors">Se alle kategorier</Link></li>
+              <li><Link href="/products?category=data" className="hover:text-gray-900 transition-colors">Data & IT</Link></li>
+              <li><Link href="/products?category=gaming" className="hover:text-gray-900 transition-colors">Gaming</Link></li>
+              <li><Link href="/products?category=mobil" className="hover:text-gray-900 transition-colors">Mobil & Tilbehør</Link></li>
+              <li><Link href="/products?category=tv" className="hover:text-gray-900 transition-colors">TV, Lyd & Bilde</Link></li>
+              <li><Link href="/products" className="hover:text-gray-900 transition-colors">Se alle kategorier</Link></li>
             </ul>
           </div>
 
           {/* 4. Om oss */}
           <div>
             <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-600">
-                <span className="text-xl font-black text-white">B</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-gray-200">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  {/* Bok-ikon - helt svart */}
+                  <path 
+                    d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" 
+                    stroke="#000000"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path 
+                    d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" 
+                    stroke="#000000"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </svg>
               </div>
               <div>
                 <span className="text-xl font-bold text-gray-900">Book</span>
-                <span className="text-xl font-bold text-amber-600">Bright</span>
+                <span className="text-xl font-bold text-gray-900">Bright</span>
               </div>
             </div>
             <p className="mb-4 text-sm text-gray-700">
@@ -77,21 +95,21 @@ export function Footer() {
               med {SITE_CONFIG.deliveryPromise.toLowerCase()} i hele Norge.
             </p>
             <div className="mb-4 space-y-2 text-sm text-gray-700">
-              <a href={`mailto:${SITE_CONFIG.supportEmail}`} className="block hover:text-green-600 transition-colors break-all">
+              <a href={`mailto:${SITE_CONFIG.supportEmail}`} className="block hover:text-gray-900 transition-colors break-all">
                 {SITE_CONFIG.supportEmail}
               </a>
-              <a href={`tel:${SITE_CONFIG.supportPhoneTel}`} className="block hover:text-green-600 transition-colors">
+              <a href={`tel:${SITE_CONFIG.supportPhoneTel}`} className="block hover:text-gray-900 transition-colors">
                 {SITE_CONFIG.supportPhoneDisplay}
               </a>
             </div>
             <div className="flex gap-3">
-              <a href="#" className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 hover:bg-green-600 hover:text-white transition-colors text-gray-700">
+              <a href="#" className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-900 hover:text-white transition-colors text-gray-700">
                 <Facebook size={18} />
               </a>
-              <a href="#" className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 hover:bg-green-600 hover:text-white transition-colors text-gray-700">
+              <a href="#" className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-900 hover:text-white transition-colors text-gray-700">
                 <Instagram size={18} />
               </a>
-              <a href="#" className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 hover:bg-green-600 hover:text-white transition-colors text-gray-700">
+              <a href="#" className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-900 hover:text-white transition-colors text-gray-700">
                 <Youtube size={18} />
               </a>
             </div>
@@ -100,7 +118,7 @@ export function Footer() {
       </div>
 
       {/* Copyright */}
-      <div className="border-t border-gray-300 bg-gray-200">
+      <div className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="text-center text-sm text-gray-600">
             <p>

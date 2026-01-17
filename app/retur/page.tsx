@@ -1,5 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { RotateCcw, Mail, Phone, Package, CheckCircle } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'Angrerett og retur',
+  description: 'Du har 14 dagers angrerett på alle produkter. Les om hvordan du returnerer produkter og får refusjon.',
+};
 
 export default function ReturPage() {
   return (
@@ -17,22 +23,23 @@ export default function ReturPage() {
         {/* Header */}
         <div className="mb-12 text-center">
           <RotateCcw className="mx-auto mb-4 h-16 w-16 text-brand" />
-          <h1 className="mb-4 text-4xl font-bold text-dark">Retur & Bytte</h1>
+          <h1 className="mb-4 text-4xl font-bold text-dark">Angrerett og retur</h1>
           <p className="text-lg text-gray-medium">
-            Du har 30 dagers åpent kjøp på alle produkter
+            Du har 14 dagers angrerett på alle produkter
           </p>
         </div>
 
-        {/* Returrett */}
+        {/* Angrerett */}
         <section className="mb-12 rounded-xl bg-white p-8 shadow-sm">
-          <h2 className="mb-6 text-2xl font-bold text-dark">Din returrett</h2>
+          <h2 className="mb-6 text-2xl font-bold text-dark">Din angrerett (14 dager)</h2>
           <div className="space-y-4">
             <div className="flex items-start gap-4">
               <CheckCircle className="mt-1 h-6 w-6 flex-shrink-0 text-brand" />
               <div>
-                <h3 className="font-semibold text-dark">30 dagers åpent kjøp</h3>
+                <h3 className="font-semibold text-dark">14 dagers angrerett</h3>
                 <p className="text-gray-medium">
-                  Du kan returnere produktet innen 30 dager uten å oppgi grunn.
+                  Du har 14 dagers angrerett fra den dagen du mottar produktet, i henhold til forbrukerkjøpsloven § 25.
+                  Du kan returnere produktet uten å oppgi grunn.
                 </p>
               </div>
             </div>
@@ -104,7 +111,8 @@ export default function ReturPage() {
               <div>
                 <h3 className="mb-2 font-semibold text-dark">Refusjon</h3>
                 <p className="text-gray-medium">
-                  Vi refunderer beløpet til samme betalingsmetode innen 5-10 virkedager etter at vi har mottatt produktet.
+                  Vi refunderer hele kjøpesummen til samme betalingsmetode (Stripe) innen 14 dager etter at vi har mottatt produktet.
+                  Du vil få bekreftelse på e-post når refusjonen er behandlet.
                 </p>
               </div>
             </div>

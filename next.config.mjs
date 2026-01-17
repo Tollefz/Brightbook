@@ -3,6 +3,18 @@ const nextConfig = {
   // NOTE: This project uses Webpack (not Turbopack) for development.
   // Turbopack is disabled via --webpack flag in package.json "dev" script.
   
+  // Externalize puppeteer packages to prevent Next.js from bundling them
+  // These packages must be loaded via Node.js runtime, not bundled
+  serverExternalPackages: [
+    "puppeteer",
+    "puppeteer-core",
+    "puppeteer-extra",
+    "puppeteer-extra-plugin",
+    "puppeteer-extra-plugin-stealth",
+    "clone-deep",
+    "merge-deep",
+  ],
+  
   images: {
     remotePatterns: [
       {

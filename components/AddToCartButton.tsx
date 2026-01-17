@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ShoppingCart, Minus, Plus, Check } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import toast from 'react-hot-toast';
+import { VariantContext } from './ProductPageClientWrapper';
 
 interface Variant {
   id: string;
@@ -30,22 +31,22 @@ interface AddToCartButtonProps {
   onVariantChange?: (variant: Variant | null) => void;
 }
 
-export default function AddToCartButton({ product, variants = [], onVariantChange }: AddToCartButtonProps) {
+export default function AddToCartButton({ product, variants = [], onVariantChange, requireVariantSelection = false }: AddToCartButtonProps) {
   const [quantity, setQuantity] = useState(1);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
-    variants.length > 0 ? variants[0].id : null
-  );
   const [added, setAdded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { addToCart } = useCart();
   const router = useRouter();
+  
+  // Try to use VariantContext if available (when used within ProductPageClientWrapper)
+  const variantContext = useContext(VariantContext);
+  
+  // Use variant from context if available, otherwise use first variant as default
+  const selectedVariant = variantContext?.selectedVariant || (variants.length > 0 ? variants[0] : null);
+  const selectedVariantId = selectedVariant?.id || null;
 
   const hasVariants = variants.length > 0;
-  const selectedVariant = useMemo(
-    () => variants.find((v) => v.id === selectedVariantId) || null,
-    [variants, selectedVariantId]
-  );
 
   // Notify parent when variant changes
   useEffect(() => {
@@ -53,6 +54,10 @@ export default function AddToCartButton({ product, variants = [], onVariantChang
       onVariantChange(selectedVariant);
     }
   }, [selectedVariant, onVariantChange]);
+
+  // Require variant selection if product has variants and requireVariantSelection is true
+  const isVariantRequired = requireVariantSelection && hasVariants && !selectedVariant;
+  const isAddToCartDisabled = isLoading || added || isVariantRequired;
 
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
   const displayCompareAtPrice = selectedVariant
@@ -64,6 +69,13 @@ export default function AddToCartButton({ product, variants = [], onVariantChang
     try {
       setIsLoading(true);
       setError(null);
+      
+      // CRITICAL: Ensure variant is selected if product has variants
+      if (hasVariants && !selectedVariant) {
+        setError('Velg farge før du legger produkt i handlekurv');
+        setIsLoading(false);
+        return;
+      }
       
       const itemToAdd = {
         productId: product.id,
@@ -82,6 +94,7 @@ export default function AddToCartButton({ product, variants = [], onVariantChang
         icon: '🛒',
       });
       setTimeout(() => setAdded(false), 2000);
+      // NOTE: "Legg i handlekurv" does NOT navigate to checkout - only "Kjøp nå" does
     } catch (err) {
       setError('Kunne ikke legge produkt i handlekurv. Prøv igjen.');
       console.error('Error adding to cart:', err);
@@ -120,16 +133,25 @@ export default function AddToCartButton({ product, variants = [], onVariantChang
         </div>
       )}
 
+      {/* Variant required message */}
+      {isVariantRequired && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-700">
+          Velg farge før du legger produkt i handlekurv
+        </div>
+      )}
+
       {/* Legg i handlekurv knapp */}
       <button
         onClick={handleAddToCart}
-        disabled={added || isLoading}
-        className={`flex w-full items-center justify-center gap-3 rounded-lg py-3 sm:py-4 text-base sm:text-lg font-semibold transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed ${
+        disabled={isAddToCartDisabled}
+        className={`flex w-full items-center justify-center gap-3 rounded-lg py-4 sm:py-5 text-base sm:text-lg font-medium transition-all shadow-premium hover:shadow-premium-hover disabled:opacity-60 disabled:cursor-not-allowed ${
           added 
-            ? 'bg-green-600 text-white' 
+            ? 'bg-gray-900 text-white' 
             : isLoading
-            ? 'bg-green-600 text-white cursor-wait'
-            : 'bg-green-600 text-white hover:bg-green-700'
+            ? 'bg-gray-900 text-white cursor-wait'
+            : isVariantRequired
+            ? 'bg-gray-300 text-white cursor-not-allowed'
+            : 'bg-gray-900 text-white hover:bg-gray-800'
         }`}
       >
         {isLoading ? (
@@ -145,6 +167,11 @@ export default function AddToCartButton({ product, variants = [], onVariantChang
             <Check size={20} className="sm:w-6 sm:h-6" />
             Lagt i handlekurv!
           </>
+        ) : isVariantRequired ? (
+          <>
+            <ShoppingCart size={20} className="sm:w-6 sm:h-6" />
+            Velg farge først
+          </>
         ) : (
           <>
             <ShoppingCart size={20} className="sm:w-6 sm:h-6" />
@@ -153,9 +180,19 @@ export default function AddToCartButton({ product, variants = [], onVariantChang
         )}
       </button>
 
-      {/* Kjøp nå knapp */}
+      {/* Kjøp nå knapp - legger i cart og navigerer til checkout (kun på PDP) */}
       <button
         onClick={async () => {
+          // CRITICAL: Guard - variant must be selected if product has variants
+          if (isVariantRequired) {
+            toast.error('Velg farge før du går til betaling', {
+              icon: '⚠️',
+              duration: 3000,
+            });
+            setError('Velg farge før du kan kjøpe produktet');
+            return;
+          }
+
           try {
             setIsLoading(true);
             setError(null);
@@ -172,19 +209,25 @@ export default function AddToCartButton({ product, variants = [], onVariantChang
             };
 
             addToCart(itemToAdd, quantity);
+            toast.success(`${product.name} lagt i handlekurv!`, {
+              icon: '🛒',
+            });
             
-            // Navigate to checkout immediately
-            router.push('/checkout');
+            // Navigate to checkout immediately (buy now flow - only on PDP)
+            setTimeout(() => {
+              router.push('/checkout');
+            }, 300); // Small delay to show toast and ensure cart is updated
           } catch (err) {
             setError('Kunne ikke legge produkt i handlekurv. Prøv igjen.');
+            toast.error('Kunne ikke legge produkt i handlekurv. Prøv igjen.');
             console.error('Error adding to cart:', err);
             setIsLoading(false);
           }
         }}
-        disabled={isLoading}
-        className="w-full rounded-lg border-2 border-green-600 py-4 text-lg font-semibold text-green-600 hover:bg-green-600 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isLoading || isVariantRequired}
+        className="w-full rounded-lg border border-gray-900 py-4 text-lg font-medium text-gray-900 hover:bg-gray-900 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isLoading ? 'Legger til...' : 'Kjøp nå'}
+        {isLoading ? 'Legger til...' : isVariantRequired ? 'Velg farge først' : 'Kjøp nå'}
       </button>
     </div>
   );
