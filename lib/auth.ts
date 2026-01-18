@@ -19,31 +19,33 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log("❌ Missing credentials");
           return null;
         }
-
-        const normalizedEmail = credentials.email.toLowerCase().trim();
-        const password = credentials.password;
-
-        // Find user by email
+      
+        const email = credentials.email.toLowerCase().trim();
+        const password = credentials.password.trim();
+      
         const user = await prisma.user.findUnique({
-          where: { email: normalizedEmail },
+          where: { email },
         });
-
-        // If user doesn't exist or has no password, return null
-        if (!user?.password) {
+      
+        if (!user || !user.password) {
+          console.log("❌ User not found or missing password");
           return null;
         }
-
-        // Compare provided password with stored hash using bcryptjs
-        const valid = await bcrypt.compare(password, user.password);
-        if (!valid) {
+      
+        const passwordMatch = await bcrypt.compare(password, user.password);
+      
+        if (!passwordMatch) {
+          console.log("❌ Password mismatch");
           return null;
         }
-
-        // Password matches, return user
+      
+        console.log("✅ Login success for", user.email);
+      
         return {
-          id: user.id,
+          id: user.id,          // MUST be string
           email: user.email,
           name: user.name,
           role: user.role,
@@ -51,24 +53,10 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user && "role" in user) {
-        token.role = (user as { role?: string }).role;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub!;
-        session.user.role = token.role as string;
-      }
-      return session;
-    },
-  },
 };
 
-export const { handlers: authHandlers } = NextAuth(authOptions);
+export async function getAuthSession() {
+  return getServerSession(authOptions);
+}
 
-export const getAuthSession = () => getServerSession(authOptions);
-
+export { getServerSession };

@@ -31,7 +31,7 @@ interface AddToCartButtonProps {
   onVariantChange?: (variant: Variant | null) => void;
 }
 
-export default function AddToCartButton({ product, variants = [], onVariantChange, requireVariantSelection = false }: AddToCartButtonProps) {
+export default function AddToCartButton({ product, variants = [], onVariantChange }: AddToCartButtonProps) {
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,8 +55,8 @@ export default function AddToCartButton({ product, variants = [], onVariantChang
     }
   }, [selectedVariant, onVariantChange]);
 
-  // Require variant selection if product has variants and requireVariantSelection is true
-  const isVariantRequired = requireVariantSelection && hasVariants && !selectedVariant;
+  // Require variant selection if product has variants
+  const isVariantRequired = hasVariants && !selectedVariant;
   const isAddToCartDisabled = isLoading || added || isVariantRequired;
 
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;

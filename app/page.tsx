@@ -3,6 +3,8 @@ import NightReadingLanding from "@/components/landing/NightReadingLanding";
 import { product as productConfig } from "@/config/product";
 import { getHeroProduct } from "@/lib/get-hero-product";
 
+export const dynamic = "force-dynamic";
+
 const baseUrl = process.env.NEXTAUTH_URL || "https://www.bookbright.no";
 
 export async function generateMetadata(): Promise<Metadata> {

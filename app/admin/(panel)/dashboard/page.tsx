@@ -5,6 +5,8 @@ import { getStoreIdFromHeadersServer } from "@/lib/store-server";
 import { safeQuery } from "@/lib/safeQuery";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 async function getDashboardStats(storeId: string) {
   const [totalProducts, activeProducts, totalOrders, totalRevenue, pendingOrders, dropship, productsByStore, categories] = await Promise.all([
     safeQuery(() => prisma.product.count(), 0, "dashboard:products:total"),

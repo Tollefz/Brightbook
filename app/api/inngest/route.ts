@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 // Dynamic import for Inngest to avoid build-time errors
-let serveHandler: { GET: any; POST: any; PUT: any } | null = null;
+let serveHandler: any = null;
 
-async function getInngestHandler() {
+async function getInngestHandler(): Promise<any> {
   if (serveHandler) return serveHandler;
 
   try {

@@ -177,7 +177,10 @@ export default function EditProduct() {
     if (newImageUrl.trim()) {
       const updatedImages = [...images, newImageUrl.trim()];
       setImages(updatedImages);
-      setFormData({ ...formData, images: JSON.stringify(updatedImages) });
+      setFormData((prev) => ({
+        ...prev,
+        images: JSON.stringify(updatedImages),
+      }));
       setNewImageUrl("");
     }
   };
@@ -211,14 +214,14 @@ export default function EditProduct() {
     setError("");
 
     try {
-      const formData = new FormData();
+      const uploadFormData = new FormData();
       fileArray.forEach((file) => {
-        formData.append("files", file);
+        uploadFormData.append("files", file);
       });
 
       const response = await fetch("/api/admin/upload-image", {
         method: "POST",
-        body: formData,
+        body: uploadFormData,
       });
 
       const data = await response.json();
@@ -231,7 +234,10 @@ export default function EditProduct() {
       if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
         const updatedImages = [...images, ...data.urls];
         setImages(updatedImages);
-        setFormData({ ...formData, images: JSON.stringify(updatedImages) });
+        setFormData(prev => ({
+          ...prev,
+          images: JSON.stringify(updatedImages),
+        }));
         
         // Log for debugging
         if (process.env.NODE_ENV === 'development') {
@@ -256,7 +262,10 @@ export default function EditProduct() {
   const handleRemoveImage = (index: number) => {
     const updatedImages = images.filter((_, i) => i !== index);
     setImages(updatedImages);
-    setFormData({ ...formData, images: JSON.stringify(updatedImages) });
+    setFormData((prev) => ({
+      ...prev,
+      images: JSON.stringify(updatedImages),
+    }));
   };
 
   const handleScrapeFromUrl = async () => {
@@ -298,19 +307,30 @@ export default function EditProduct() {
   };
 
   const handleUseScrapedPrice = () => {
-    if (scrapeResult?.price) {
-      setFormData({ ...formData, price: scrapeResult.price });
-      if (scrapeResult.supplierPrice) {
-        setFormData({ ...formData, price: scrapeResult.price, supplierPrice: scrapeResult.supplierPrice });
-      }
+    const p = scrapeResult?.price;
+    if (typeof p !== "number") return;
+    
+    setFormData((prev) => ({
+      ...prev,
+      price: p,
+    }));
+    if (scrapeResult?.supplierPrice != null) {
+      setFormData((prev) => ({
+        ...prev,
+        price: p,
+        supplierPrice: scrapeResult?.supplierPrice ?? null,
+      }));
     }
   };
 
   const handleUseScrapedImages = () => {
     if (scrapeResult?.images && scrapeResult.images.length > 0) {
-      const updatedImages = [...images, ...scrapeResult.images];
+      const updatedImages = [...images, ...(scrapeResult?.images ?? [])];
       setImages(updatedImages);
-      setFormData({ ...formData, images: JSON.stringify(updatedImages) });
+      setFormData((prev) => ({
+        ...prev,
+        images: JSON.stringify(updatedImages),
+      }));
       setScrapeResult(null); // Clear scrape result after using
     }
   };
@@ -319,7 +339,10 @@ export default function EditProduct() {
     if (!images.includes(imageUrl)) {
       const updatedImages = [...images, imageUrl];
       setImages(updatedImages);
-      setFormData({ ...formData, images: JSON.stringify(updatedImages) });
+      setFormData((prev) => ({
+        ...prev,
+        images: JSON.stringify(updatedImages),
+      }));
     }
   };
 
@@ -479,7 +502,12 @@ export default function EditProduct() {
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  name: e.target.value,
+                }))
+              }
               className="w-full rounded-lg border border-slate-300 p-3"
               required
             />
@@ -489,7 +517,12 @@ export default function EditProduct() {
             <label className="mb-1 block text-sm font-medium">Kategori</label>
             <select
               value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  category: e.target.value,
+                }))
+              }
               className="w-full rounded-lg border border-slate-300 p-3"
             >
               <option>Elektronikk</option>
@@ -506,10 +539,10 @@ export default function EditProduct() {
               value={formData.supplierPrice ?? ""}
               onChange={(e) => {
                 const value = e.target.value;
-                setFormData({ 
-                  ...formData, 
-                  supplierPrice: value === "" ? null : (parseFloat(value) || null)
-                });
+                setFormData((prev) => ({
+                  ...prev,
+                  supplierPrice: value === "" ? null : (parseFloat(value) || null),
+                }));
               }}
               className="w-full rounded-lg border border-slate-300 p-3"
             />
@@ -522,10 +555,10 @@ export default function EditProduct() {
               value={formData.price ?? ""}
               onChange={(e) => {
                 const value = e.target.value;
-                setFormData({ 
-                  ...formData, 
-                  price: value === "" ? 0 : (parseFloat(value) || 0)
-                });
+                setFormData((prev) => ({
+                  ...prev,
+                  price: value === "" ? 0 : (parseFloat(value) || 0),
+                }));
               }}
               className="w-full rounded-lg border border-slate-300 p-3"
               required
@@ -539,10 +572,10 @@ export default function EditProduct() {
               value={formData.compareAtPrice ?? ""}
               onChange={(e) => {
                 const value = e.target.value;
-                setFormData({ 
-                  ...formData, 
-                  compareAtPrice: value === "" ? null : (parseFloat(value) || null)
-                });
+                setFormData((prev) => ({
+                  ...prev,
+                  compareAtPrice: value === "" ? null : (parseFloat(value) || null),
+                }));
               }}
               className="w-full rounded-lg border border-slate-300 p-3"
             />
@@ -565,7 +598,12 @@ export default function EditProduct() {
               <input
                 type="text"
                 value={formData.supplierName}
-                onChange={(e) => setFormData({ ...formData, supplierName: e.target.value })}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    supplierName: e.target.value,
+                  }))
+                }
                 placeholder="f.eks. Alibaba, Temu, eBay"
                 className="w-full rounded-lg border border-slate-300 p-3"
               />
@@ -577,7 +615,12 @@ export default function EditProduct() {
                 <input
                   type="url"
                   value={formData.supplierUrl}
-                  onChange={(e) => setFormData({ ...formData, supplierUrl: e.target.value })}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        supplierUrl: e.target.value,
+                      }))
+                    }
                   placeholder="https://www.temu.com/no/... eller https://www.alibaba.com/product-detail/..."
                   className="flex-1 rounded-lg border border-slate-300 p-3"
                 />
@@ -637,15 +680,15 @@ export default function EditProduct() {
                   </div>
                   
                   {/* Pris */}
-                  {scrapeResult.price && (
+                  {scrapeResult?.price && (
                     <div className="mb-3 flex items-center justify-between rounded-lg bg-white p-3">
                       <div>
                         <p className="text-sm font-medium text-gray-700">Pris funnet</p>
                         <p className="text-lg font-bold text-green-700">
-                          {scrapeResult.price.toFixed(0)} kr
-                          {scrapeResult.supplierPrice && scrapeResult.supplierPrice !== scrapeResult.price && (
+                          {scrapeResult?.price.toFixed(0)} kr
+                          {scrapeResult?.supplierPrice && scrapeResult?.supplierPrice !== scrapeResult?.price && (
                             <span className="ml-2 text-sm text-gray-500">
-                              (Leverandør: {scrapeResult.supplierPrice.toFixed(0)} kr)
+                              (Leverandør: {scrapeResult?.supplierPrice.toFixed(0)} kr)
                             </span>
                           )}
                         </p>
@@ -662,11 +705,11 @@ export default function EditProduct() {
                   )}
                   
                   {/* Bilder */}
-                  {scrapeResult.images && scrapeResult.images.length > 0 ? (
+                  {scrapeResult?.images && scrapeResult.images.length > 0 ? (
                     <div>
                       <div className="mb-2 flex items-center justify-between">
                         <p className="text-sm font-medium text-gray-700">
-                          {scrapeResult.images.length} bilde(r) funnet
+                          {scrapeResult?.images.length} bilde(r) funnet
                         </p>
                         <button
                           type="button"
@@ -678,7 +721,7 @@ export default function EditProduct() {
                         </button>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
-                        {scrapeResult.images.map((imgUrl, idx) => (
+                        {scrapeResult?.images.map((imgUrl, idx) => (
                           <div key={idx} className="group relative">
                             <div className="relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
                               <Image
@@ -826,7 +869,12 @@ export default function EditProduct() {
             <input
               type="checkbox"
               checked={formData.isActive}
-              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  isActive: e.target.checked,
+                }))
+              }
               className="rounded border-slate-300"
             />
             <span>Aktivt produkt</span>
@@ -838,7 +886,12 @@ export default function EditProduct() {
           <input
             type="text"
             value={formData.shortDescription}
-            onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                shortDescription: e.target.value,
+              }))
+            }
             className="w-full rounded-lg border border-slate-300 p-3"
             maxLength={150}
           />
@@ -874,7 +927,10 @@ export default function EditProduct() {
                   type="productDescription"
                   onResult={(result) => {
                     if (result.description) {
-                      setFormData({ ...formData, description: result.description });
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: result.description,
+                      }));
                       setAiModalOpen(false);
                     }
                   }}
@@ -889,7 +945,12 @@ export default function EditProduct() {
           </div>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                description: e.target.value,
+              }))
+            }
             rows={6}
             className="w-full rounded-lg border border-slate-300 p-3"
           />
@@ -954,8 +1015,8 @@ export default function EditProduct() {
                 setVariantForm({
                   name: "",
                   price: formData.price,
-                  compareAtPrice: formData.compareAtPrice,
-                  supplierPrice: formData.supplierPrice,
+                  compareAtPrice: formData.compareAtPrice ?? undefined,
+                  supplierPrice: formData.supplierPrice ?? undefined,
                   image: "",
                   attributes: {},
                   stock: 10,
@@ -974,7 +1035,7 @@ export default function EditProduct() {
             <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-sm font-medium text-gray-700">
-                  {scrapeResult.variants.length} variant(er) funnet fra URL
+                  {scrapeResult?.variants.length} variant(er) funnet fra URL
                 </p>
                 <button
                   type="button"
@@ -986,7 +1047,7 @@ export default function EditProduct() {
                 </button>
               </div>
               <div className="space-y-2">
-                {scrapeResult.variants.slice(0, 3).map((v, idx) => (
+                {scrapeResult?.variants.slice(0, 3).map((v, idx) => (
                   <div key={idx} className="rounded-lg bg-white p-2 text-sm">
                     <span className="font-medium">{v.name}</span>
                     {" - "}
@@ -998,8 +1059,8 @@ export default function EditProduct() {
                     )}
                   </div>
                 ))}
-                {scrapeResult.variants.length > 3 && (
-                  <p className="text-xs text-gray-600">... og {scrapeResult.variants.length - 3} flere</p>
+                {scrapeResult?.variants.length && scrapeResult?.variants.length > 3 && (
+                  <p className="text-xs text-gray-600">... og {scrapeResult?.variants.length - 3} flere</p>
                 )}
               </div>
             </div>
@@ -1104,12 +1165,12 @@ export default function EditProduct() {
                           
                           setUploading(true);
                           try {
-                            const formData = new FormData();
-                            formData.append("files", file);
+                            const uploadFormData = new FormData();
+                            uploadFormData.append("files", file);
                             
                             const response = await fetch("/api/admin/upload-image", {
                               method: "POST",
-                              body: formData,
+                              body: uploadFormData,
                             });
                             
                             const data = await response.json();

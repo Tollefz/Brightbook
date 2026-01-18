@@ -382,7 +382,7 @@ export default function NightReadingLanding({ product, heroImage, images: produc
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            {features.map((feature, index) => (
+            {features.map((feature: { title: string; description: string }, index: number) => (
               <div
                 key={index}
                 className="rounded-xl bg-white p-6 lg:p-8 shadow-sm hover:shadow-md transition-shadow border border-gray-100"

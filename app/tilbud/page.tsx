@@ -177,7 +177,13 @@ export default async function TilbudPage() {
                       images: images,
                       category: product.category,
                     }}
-                    variants={product.variants || []}
+                    variants={(product.variants || []).map((v) => ({
+                      id: v.id,
+                      name: v.name,
+                      attributes: (v.attributes as Record<string, string>) || undefined,
+                      stock: v.stock,
+                      sortOrder: v.sortOrder ?? undefined,
+                    }))}
                   />
                 </div>
               );

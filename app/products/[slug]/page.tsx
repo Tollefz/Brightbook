@@ -16,8 +16,8 @@ import { safeQuery } from '@/lib/safeQuery';
 import { SITE_CONFIG } from '@/lib/site';
 
 interface ProductPageProps {
-  params: Promise<{ slug: string }> | { slug: string };
-  searchParams: Promise<{ variant?: string }> | { variant?: string };
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ variant?: string }>;
 }
 
 type VariantDisplay = {
@@ -28,19 +28,16 @@ type VariantDisplay = {
   image: string | null;
   attributes: Record<string, string>;
   stock: number;
+  isActive: boolean;
   colorCode: string;
   slug: string;
 };
-
-async function getParams(params: ProductPageProps["params"]) {
-  return params instanceof Promise ? await params : params;
-}
 
 // ISR: Revalidate every 60 seconds
 export const revalidate = 60;
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const { slug } = await getParams(params);
+  const { slug } = await params;
   const storeId = await getStoreIdFromHeadersServer();
   
   const product = await safeQuery(
@@ -117,8 +114,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductPage({ params, searchParams }: ProductPageProps) {
-  const { slug } = await getParams(params);
-  const { variant: variantParam } = await (searchParams instanceof Promise ? searchParams : Promise.resolve(searchParams));
+  const { slug } = await params;
+  const { variant: variantParam } = await searchParams;
   const headerStoreId = await getStoreIdFromHeadersServer();
   const safeStoreId = headerStoreId && headerStoreId !== 'demo-store' ? headerStoreId : DEFAULT_STORE_ID;
   
@@ -716,7 +713,6 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
               <AddToCartButton 
                 product={productData} 
                 variants={variants}
-                requireVariantSelection={variants.length > 0}
               />
 
               {/* Manuell oppfyllelse info */}

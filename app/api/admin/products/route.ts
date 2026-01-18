@@ -6,7 +6,7 @@ import { improveTitle } from "@/lib/utils/improve-product-title";
 import { safeQuery } from "@/lib/safeQuery";
 import { logError } from "@/lib/utils/logger";
 import { DEFAULT_STORE_ID } from "@/lib/store";
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath } from 'next/cache';
 
 // Force dynamic rendering to allow revalidation
 export const dynamic = 'force-dynamic';
@@ -195,7 +195,6 @@ export async function POST(req: Request) {
       revalidatePath('/');
       revalidatePath('/products');
       revalidatePath(`/products/${product.slug}`);
-      revalidateTag('products');
       if (process.env.NODE_ENV === 'development') {
         console.log(`[revalidate] Revalidated paths after creating product: ${product.slug}`);
       }

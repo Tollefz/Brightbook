@@ -15,8 +15,8 @@ import type { Metadata } from "next";
 const baseUrl = process.env.NEXTAUTH_URL || "https://www.bookbright.no";
 
 export async function generateMetadata({ searchParams }: ProductsPageProps): Promise<Metadata> {
-  const params = await getParams(searchParams);
-  const categorySlug = params.category ?? undefined;
+  const sp = (await searchParams) ?? {};
+  const categorySlug = Array.isArray(sp.category) ? sp.category[0] : (sp.category ?? undefined);
   const categoryDef = getCategoryBySlug(categorySlug);
   const categoryName = categoryDef?.label;
   const title = categoryName ? `${categoryName} - BookBright` : "Produkter - BookBright";
@@ -45,21 +45,17 @@ export async function generateMetadata({ searchParams }: ProductsPageProps): Pro
 }
 
 interface ProductsPageProps {
-  searchParams: Promise<Record<string, string | undefined>> | Record<string, string | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const PAGE_SIZE = 12;
 
-async function getParams(searchParams: ProductsPageProps["searchParams"]) {
-  return searchParams instanceof Promise ? await searchParams : searchParams;
-}
-
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  const params = await getParams(searchParams);
+  const sp = (await searchParams) ?? {};
   const headerStoreId = await getStoreIdFromHeadersServer();
   const storeId = headerStoreId || DEFAULT_STORE_ID;
-  const page = Math.max(1, Number(params.page ?? "1"));
-  const categorySlug = params.category ?? undefined;
+  const page = Math.max(1, Number(sp.page ?? "1"));
+  const categorySlug = Array.isArray(sp.category) ? sp.category[0] : (sp.category ?? undefined);
   const categoryDef = getCategoryBySlug(categorySlug);
   const categoryName = categoryDef?.label;
   const categoryDbValue = categoryDef?.dbValue;
@@ -68,10 +64,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const isUnknownCategory = categorySlug && !categoryDef;
   
   // Støtt både 'q' og 'query' for søkeparameter
-  const query = params.q ?? params.query ?? undefined;
-  const sort = params.sort ?? "newest";
-  const minPrice = params.minPrice ? Number(params.minPrice) : undefined;
-  const maxPrice = params.maxPrice ? Number(params.maxPrice) : undefined;
+  const queryRaw = sp.q ?? sp.query ?? undefined;
+  const query = Array.isArray(queryRaw) ? queryRaw[0] : (queryRaw ?? undefined);
+  const sortRaw = sp.sort ?? "newest";
+  const sort = Array.isArray(sortRaw) ? sortRaw[0] : sortRaw;
+  const minPrice = sp.minPrice ? Number(sp.minPrice) : undefined;
+  const maxPrice = sp.maxPrice ? Number(sp.maxPrice) : undefined;
 
   // Ensure we don't query demo-store products - fallback to DEFAULT_STORE_ID (Electro Hype)
   const safeStoreId = storeId === "demo-store" ? DEFAULT_STORE_ID : storeId;
@@ -119,6 +117,15 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     images: any;
     category: string | null;
     isActive: boolean;
+    variants?: Array<{
+      id: string;
+      name: string;
+      attributes: any;
+      image: string | null;
+      price: number | Prisma.Decimal;
+      stock: number;
+      sortOrder: number | null;
+    }>;
   }> = [];
   let total = 0;
   let categoryRecords: Array<{ category: string | null }> = [];
@@ -254,6 +261,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     price: Number(product.price),
     compareAtPrice: product.compareAtPrice ? Number(product.compareAtPrice) : null,
     images: product.images,
+    variants: (product.variants || []).map((v) => ({
+      id: v.id,
+      name: v.name,
+      attributes: v.attributes,
+      stock: v.stock,
+      sortOrder: v.sortOrder ?? undefined,
+    })),
   }));
 
   // Debug logging to inspect filters and result size (server-side)

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthSession } from "@/lib/auth";
 import { validateVariantAttributes } from "@/lib/validation/color-validation";
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath } from 'next/cache';
 
 // Force dynamic rendering to allow revalidation
 export const dynamic = 'force-dynamic';
@@ -94,7 +94,6 @@ export async function POST(
       if (variant.product?.slug) {
         revalidatePath(`/products/${variant.product.slug}`);
       }
-      revalidateTag('products');
       if (process.env.NODE_ENV === 'development') {
         console.log(`[revalidate] Revalidated paths after creating variant: ${variant.name}`);
       }
@@ -182,7 +181,6 @@ export async function PUT(
       if (product?.slug) {
         revalidatePath(`/products/${product.slug}`);
       }
-      revalidateTag('products');
       if (process.env.NODE_ENV === 'development') {
         console.log(`[revalidate] Revalidated paths after updating variants for product: ${product?.slug || id}`);
       }

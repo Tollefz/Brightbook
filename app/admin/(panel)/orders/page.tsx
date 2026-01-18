@@ -5,6 +5,8 @@ import { Suspense } from "react";
 import { OrderStatus, FulfillmentStatus } from "@prisma/client";
 import { safeQuery } from "@/lib/safeQuery";
 
+export const dynamic = "force-dynamic";
+
 async function getOrders(filter?: string, search?: string) {
   const where: any = {};
 

@@ -7,6 +7,8 @@ import Link from "next/link";
 import OrderDetailsClient from "./OrderDetailsClient";
 import { safeQuery } from "@/lib/safeQuery";
 
+export const dynamic = "force-dynamic";
+
 async function getOrder(id: string) {
   // Valider id
   if (!id || typeof id !== "string" || id.trim() === "") {
