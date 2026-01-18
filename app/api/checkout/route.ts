@@ -11,7 +11,7 @@ import { getStoreIdFromHeadersServer } from "@/lib/store-server";
  * 
  * Environment variables required:
  * - STRIPE_SECRET_KEY (sk_test_... or sk_live_...)
- * - NEXTAUTH_URL (for success/cancel URLs)
+ * - NEXT_PUBLIC_SITE_URL or NEXTAUTH_URL (for success/cancel URLs)
  */
 export async function POST(req: Request) {
   try {
@@ -123,7 +123,8 @@ export async function POST(req: Request) {
     logInfo(`Order created: ${order.id} (${orderNumber})`, "[api/checkout]");
 
     // Create Stripe Checkout Session
-    const baseUrl = process.env.NEXTAUTH_URL || "https://www.bookbright.no";
+    // Use NEXT_PUBLIC_SITE_URL first (for public pages), fallback to NEXTAUTH_URL
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://www.bookbright.no";
     
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],

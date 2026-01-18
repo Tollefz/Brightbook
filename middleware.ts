@@ -15,6 +15,11 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // CRITICAL: Always exclude NextAuth API routes
+  if (pathname.startsWith("/api/auth")) {
+    return NextResponse.next();
+  }
+
   // Explicitly exclude login page - this prevents redirect loops
   // Login page is in (auth) route group and protected by (panel)/layout.tsx
   if (pathname === "/admin/login") {

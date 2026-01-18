@@ -12,7 +12,9 @@ import { getStoreIdFromHeadersServer } from "@/lib/store-server";
 import { getCategoryBySlug, getAllCategorySlugs, CATEGORY_DEFINITIONS } from "@/lib/categories";
 import type { Metadata } from "next";
 
-const baseUrl = process.env.NEXTAUTH_URL || "https://www.bookbright.no";
+// Use NEXT_PUBLIC_SITE_URL for public pages (not NEXTAUTH_URL)
+// This ensures public pages work even if auth is not configured
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.bookbright.no";
 
 export async function generateMetadata({ searchParams }: ProductsPageProps): Promise<Metadata> {
   const sp = (await searchParams) ?? {};

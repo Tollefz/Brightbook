@@ -5,7 +5,9 @@ import { getHeroProduct } from "@/lib/get-hero-product";
 
 export const dynamic = "force-dynamic";
 
-const baseUrl = process.env.NEXTAUTH_URL || "https://www.bookbright.no";
+// Use NEXT_PUBLIC_SITE_URL for public pages (not NEXTAUTH_URL)
+// This ensures public pages work even if auth is not configured
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.bookbright.no";
 
 export async function generateMetadata(): Promise<Metadata> {
   // Fetch hero product from database with fallback logic

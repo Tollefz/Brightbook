@@ -3,25 +3,83 @@ import { authOptions, validateAuthConfig } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
-const baseHandler = NextAuth(authOptions);
+// PROD DEBUG: Log auth config on module load (server-side only)
+if (typeof window === "undefined") {
+  const githubId = process.env.GITHUB_ID || process.env.GITHUB_CLIENT_ID;
+  const githubSecret = process.env.GITHUB_SECRET || process.env.GITHUB_CLIENT_SECRET;
+  const nextAuthUrl = process.env.NEXTAUTH_URL;
+  const nextAuthSecret = process.env.NEXTAUTH_SECRET;
 
-// Wrap handlers to validate GitHub env vars at runtime (not during build)
-// This only runs when requests are handled, not during build
-const wrappedHandler = {
+  console.log("[AUTH ROUTE] Module loaded - checking providers:");
+  console.log(`[AUTH ROUTE] Providers count: ${authOptions.providers?.length || 0}`);
+  console.log(`[AUTH ROUTE] Provider IDs: ${authOptions.providers?.map((p: any) => p.id).join(", ") || "none"}`);
+  
+  const missing = [];
+  if (!githubId) missing.push("GITHUB_ID/GITHUB_CLIENT_ID");
+  if (!githubSecret) missing.push("GITHUB_SECRET/GITHUB_CLIENT_SECRET");
+  if (!nextAuthUrl) missing.push("NEXTAUTH_URL");
+  if (!nextAuthSecret) missing.push("NEXTAUTH_SECRET");
+  
+  if (missing.length > 0) {
+    console.error(`[AUTH ROUTE] MISSING ENV VARS: ${missing.join(", ")}`);
+  } else {
+    console.log("[AUTH ROUTE] All env vars present (values not logged)");
+  }
+}
+
+// Safe mode: Validate but don't fail hard
+// This allows the route to respond even if auth is not fully configured
+try {
+  validateAuthConfig();
+} catch (error) {
+  console.error("[AUTH ROUTE] Config validation error (non-fatal):", error);
+}
+
+const handler = NextAuth(authOptions);
+
+// Wrap handlers to catch any errors and return graceful responses
+const safeHandler = {
   GET: async (req: Request, context: any) => {
-    if (process.env.NODE_ENV === "production") {
-      validateAuthConfig();
+    // PROD DEBUG: Log on each request
+    console.log("[AUTH ROUTE] GET request received");
+    console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
+    
+    try {
+      return await handler.GET(req, context);
+    } catch (error) {
+      console.error("[AUTH ROUTE] GET handler error:", error);
+      console.error("[AUTH ROUTE] Error stack:", (error as Error).stack);
+      // Return a basic error response instead of crashing
+      return new Response(
+        JSON.stringify({ error: "Authentication service temporarily unavailable" }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
-    return baseHandler.GET(req, context);
   },
   POST: async (req: Request, context: any) => {
-    if (process.env.NODE_ENV === "production") {
-      validateAuthConfig();
+    // PROD DEBUG: Log on each request
+    console.log("[AUTH ROUTE] POST request received");
+    console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
+    
+    try {
+      return await handler.POST(req, context);
+    } catch (error) {
+      console.error("[AUTH ROUTE] POST handler error:", error);
+      console.error("[AUTH ROUTE] Error stack:", (error as Error).stack);
+      return new Response(
+        JSON.stringify({ error: "Authentication service temporarily unavailable" }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
-    return baseHandler.POST(req, context);
   },
 };
 
-export const GET = wrappedHandler.GET;
-export const POST = wrappedHandler.POST;
+export const GET = safeHandler.GET;
+export const POST = safeHandler.POST;
 

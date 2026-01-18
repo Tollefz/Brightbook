@@ -9,7 +9,9 @@ import type { Metadata } from "next";
 // ISR: Revalidate every 60 seconds
 export const revalidate = 60;
 
-const baseUrl = process.env.NEXTAUTH_URL || "https://www.bookbright.no";
+// Use NEXT_PUBLIC_SITE_URL for public pages (not NEXTAUTH_URL)
+// This ensures public pages work even if auth is not configured
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.bookbright.no";
 
 export const metadata: Metadata = {
   title: "Tilbud - BookBright",
