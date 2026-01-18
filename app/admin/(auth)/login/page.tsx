@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+export const dynamic = "force-dynamic";
+
+import { useEffect, useState } from "react";
 
 /**
  * Admin login page - Public route (no auth required)
@@ -16,75 +16,50 @@ import { useRouter } from "next/navigation";
  * - This page is in (auth) group, so it's never checked by auth guard
  */
 export default function AdminLogin() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [providerStatus, setProviderStatus] = useState<string>("Laster...");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    const result = await signIn("credentials", {
-      redirect: false,
-      email,
-      password,
-    });
-
-    if (result?.error) {
-      setError("Ugyldig e-post eller passord");
-      setLoading(false);
-    } else {
-      router.push("/admin/dashboard");
-      router.refresh();
-    }
-  };
+  useEffect(() => {
+    fetch("/api/auth/providers")
+      .then((res) => {
+        if (!res.ok) {
+          setProviderStatus(`NextAuth providers FEIL: ${res.status}`);
+          return;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data) {
+          setProviderStatus(`NextAuth OK: ${JSON.stringify(data)}`);
+        }
+      })
+      .catch((err) => {
+        setProviderStatus(`NextAuth providers FEIL: ${err.message}`);
+      });
+  }, []);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface">
-      <div className="w-full max-w-md rounded-lg border border-border bg-white p-8 shadow-komplett">
-        <h1 className="mb-2 text-3xl font-bold text-primary">Admin Login</h1>
-        <p className="mb-6 text-secondary">Administrer din nettbutikk</p>
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="w-full max-w-md rounded-lg border bg-white p-6 shadow">
+        <div className="mb-4 rounded bg-yellow-100 px-3 py-2 text-sm font-semibold text-yellow-800">
+          GITHUB LOGIN ENABLED ✅
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-primary">E-post</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none"
-              required
-            />
-          </div>
+        <div className="mb-4 rounded bg-gray-100 px-3 py-2 text-xs text-gray-700">
+          <strong>Debug:</strong> {providerStatus}
+        </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-primary">Passord</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none"
-              required
-            />
-          </div>
+        <h1 className="mb-6 text-3xl font-bold">Admin Login</h1>
 
-          {error && (
-            <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-accent-red">
-              {error}
-            </div>
-          )}
+        <a
+          href="/api/auth/signin/github?callbackUrl=/admin"
+          className="block w-full rounded bg-black px-4 py-2 text-center text-white hover:bg-gray-800"
+        >
+          Logg inn med GitHub
+        </a>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-primary py-3 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50 transition-colors"
-          >
-            {loading ? "Logger inn..." : "Logg inn"}
-          </button>
-        </form>
+        <p className="mt-4 text-xs text-gray-500 text-center">
+          Hvis du klikker og ingenting skjer: åpne /api/auth/signin/github direkte.
+        </p>
       </div>
     </div>
   );

@@ -1,8 +1,29 @@
-import bcrypt from "bcryptjs";
 import NextAuth, { type NextAuthOptions, getServerSession } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
-import { prisma } from "./prisma";
+import GitHub from "next-auth/providers/github";
 
+// Get GitHub env vars
+const githubId = process.env.GITHUB_ID;
+const githubSecret = process.env.GITHUB_SECRET;
+
+// Hard fail at runtime (not during build) if GitHub env vars are missing
+// During build, Next.js evaluates modules, so we allow undefined for build
+// But at runtime in production, we must have these values
+// We validate in the route handler to avoid breaking builds
+function validateGitHubEnv() {
+  if (process.env.NODE_ENV === "production" && typeof window === "undefined") {
+    if (!githubId || !githubSecret) {
+      throw new Error("Missing GITHUB_ID or GITHUB_SECRET environment variables");
+    }
+  }
+}
+
+// Export validation function for use in route handler
+export function validateAuthConfig() {
+  validateGitHubEnv();
+}
+
+// Always include GitHub provider (required for NextAuth)
+// If env vars are missing, it will fail at runtime when used
 export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/admin/login",
@@ -11,46 +32,9 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   providers: [
-    Credentials({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          console.log("❌ Missing credentials");
-          return null;
-        }
-      
-        const email = credentials.email.toLowerCase().trim();
-        const password = credentials.password.trim();
-      
-        const user = await prisma.user.findUnique({
-          where: { email },
-        });
-      
-        if (!user || !user.password) {
-          console.log("❌ User not found or missing password");
-          return null;
-        }
-      
-        const passwordMatch = await bcrypt.compare(password, user.password);
-      
-        if (!passwordMatch) {
-          console.log("❌ Password mismatch");
-          return null;
-        }
-      
-        console.log("✅ Login success for", user.email);
-      
-        return {
-          id: user.id,          // MUST be string
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
-      },
+    GitHub({
+      clientId: githubId || "",
+      clientSecret: githubSecret || "",
     }),
   ],
 };

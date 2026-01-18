@@ -1,14 +1,16 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { getAuthSession } from "@/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminHeader from "@/components/admin/AdminHeader";
 import { GlobalAIAssistantWrapper } from "@/components/admin/GlobalAIAssistantWrapper";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const session = await getAuthSession();
+  const session = await getServerSession(authOptions);
 
-  if (!session) {
+  if (!session || !isAdminEmail(session.user?.email)) {
     redirect("/admin/login");
   }
 
