@@ -58,21 +58,8 @@ function createPrismaClient(): PrismaClient {
       // No need to configure connection pool size manually
     });
     
-    // In development, test connection on startup (non-blocking)
-    if (process.env.NODE_ENV === "development") {
-      client.$connect().catch((err) => {
-        console.error("❌ [Prisma] Failed to connect to database:");
-        console.error("   Error:", err.message);
-        if (err.cause) {
-          console.error("   Cause:", err.cause);
-        }
-        console.error("   Check:");
-        console.error("   1. DATABASE_URL is correct in .env");
-        console.error("   2. Database is accessible (check Neon Dashboard)");
-        console.error("   3. Network/firewall allows connection");
-        console.error("   4. Database credentials are valid");
-      });
-    }
+    // Don't connect on import - connection will be established on first query
+    // This prevents import-time failures and allows graceful degradation
     
     return client;
   } catch (err: any) {
