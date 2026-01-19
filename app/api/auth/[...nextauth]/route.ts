@@ -35,9 +35,19 @@ try {
   console.error("[AUTH ROUTE] Config validation error (non-fatal):", error);
 }
 
-// Initialize NextAuth and get handlers
+// Initialize NextAuth - in v4, this returns an object with GET and POST directly
 const handler = NextAuth(authOptions);
-const { handlers } = handler;
+
+// PROD DEBUG: Log handler structure
+if (typeof window === "undefined") {
+  console.log("[AUTH ROUTE] Handler type:", typeof handler);
+  console.log("[AUTH ROUTE] Handler keys:", handler ? Object.keys(handler) : "null");
+  if (handler && typeof handler === "object") {
+    console.log("[AUTH ROUTE] Has GET:", typeof (handler as any).GET);
+    console.log("[AUTH ROUTE] Has POST:", typeof (handler as any).POST);
+    console.log("[AUTH ROUTE] Has handlers:", typeof (handler as any).handlers);
+  }
+}
 
 // Export GET and POST with error handling
 export async function GET(req: Request, context: any) {
@@ -46,11 +56,14 @@ export async function GET(req: Request, context: any) {
   console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
   
   try {
-    if (handlers && typeof handlers.GET === "function") {
-      return await handlers.GET(req, context);
+    // Try different patterns for NextAuth v4
+    if (handler && typeof (handler as any).GET === "function") {
+      return await (handler as any).GET(req, context);
+    } else if (handler && (handler as any).handlers && typeof (handler as any).handlers.GET === "function") {
+      return await (handler as any).handlers.GET(req, context);
     } else {
-      console.error("[AUTH ROUTE] handlers.GET is not a function", typeof handlers, handlers);
-      throw new Error("NextAuth handlers not properly initialized");
+      console.error("[AUTH ROUTE] Cannot find GET handler", typeof handler, handler ? Object.keys(handler) : "null");
+      throw new Error("NextAuth GET handler not found");
     }
   } catch (error) {
     console.error("[AUTH ROUTE] GET handler error:", error);
@@ -71,11 +84,14 @@ export async function POST(req: Request, context: any) {
   console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
   
   try {
-    if (handlers && typeof handlers.POST === "function") {
-      return await handlers.POST(req, context);
+    // Try different patterns for NextAuth v4
+    if (handler && typeof (handler as any).POST === "function") {
+      return await (handler as any).POST(req, context);
+    } else if (handler && (handler as any).handlers && typeof (handler as any).handlers.POST === "function") {
+      return await (handler as any).handlers.POST(req, context);
     } else {
-      console.error("[AUTH ROUTE] handlers.POST is not a function", typeof handlers, handlers);
-      throw new Error("NextAuth handlers not properly initialized");
+      console.error("[AUTH ROUTE] Cannot find POST handler", typeof handler, handler ? Object.keys(handler) : "null");
+      throw new Error("NextAuth POST handler not found");
     }
   } catch (error) {
     console.error("[AUTH ROUTE] POST handler error:", error);
