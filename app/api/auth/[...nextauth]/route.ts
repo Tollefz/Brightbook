@@ -35,26 +35,26 @@ try {
   console.error("[AUTH ROUTE] Config validation error (non-fatal):", error);
 }
 
+// Initialize NextAuth and get handlers
 const handler = NextAuth(authOptions);
+const { handlers } = handler;
 
-// Export GET and POST directly from NextAuth handler with error handling
+// Export GET and POST with error handling
 export async function GET(req: Request, context: any) {
   // PROD DEBUG: Log on each request
   console.log("[AUTH ROUTE] GET request received");
   console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
   
   try {
-    // NextAuth handler returns an object with GET and POST methods
-    if (handler && typeof handler.GET === "function") {
-      return await handler.GET(req, context);
+    if (handlers && typeof handlers.GET === "function") {
+      return await handlers.GET(req, context);
     } else {
-      console.error("[AUTH ROUTE] Handler.GET is not a function", typeof handler, handler);
-      throw new Error("NextAuth handler not properly initialized");
+      console.error("[AUTH ROUTE] handlers.GET is not a function", typeof handlers, handlers);
+      throw new Error("NextAuth handlers not properly initialized");
     }
   } catch (error) {
     console.error("[AUTH ROUTE] GET handler error:", error);
     console.error("[AUTH ROUTE] Error stack:", (error as Error).stack);
-    // Return a basic error response instead of crashing
     return new Response(
       JSON.stringify({ error: "Authentication service temporarily unavailable" }),
       {
@@ -71,12 +71,11 @@ export async function POST(req: Request, context: any) {
   console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
   
   try {
-    // NextAuth handler returns an object with GET and POST methods
-    if (handler && typeof handler.POST === "function") {
-      return await handler.POST(req, context);
+    if (handlers && typeof handlers.POST === "function") {
+      return await handlers.POST(req, context);
     } else {
-      console.error("[AUTH ROUTE] Handler.POST is not a function", typeof handler, handler);
-      throw new Error("NextAuth handler not properly initialized");
+      console.error("[AUTH ROUTE] handlers.POST is not a function", typeof handlers, handlers);
+      throw new Error("NextAuth handlers not properly initialized");
     }
   } catch (error) {
     console.error("[AUTH ROUTE] POST handler error:", error);
