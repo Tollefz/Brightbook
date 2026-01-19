@@ -37,49 +37,57 @@ try {
 
 const handler = NextAuth(authOptions);
 
-// Wrap handlers to catch any errors and return graceful responses
-const safeHandler = {
-  GET: async (req: Request, context: any) => {
-    // PROD DEBUG: Log on each request
-    console.log("[AUTH ROUTE] GET request received");
-    console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
-    
-    try {
+// Export GET and POST directly from NextAuth handler with error handling
+export async function GET(req: Request, context: any) {
+  // PROD DEBUG: Log on each request
+  console.log("[AUTH ROUTE] GET request received");
+  console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
+  
+  try {
+    // NextAuth handler returns an object with GET and POST methods
+    if (handler && typeof handler.GET === "function") {
       return await handler.GET(req, context);
-    } catch (error) {
-      console.error("[AUTH ROUTE] GET handler error:", error);
-      console.error("[AUTH ROUTE] Error stack:", (error as Error).stack);
-      // Return a basic error response instead of crashing
-      return new Response(
-        JSON.stringify({ error: "Authentication service temporarily unavailable" }),
-        {
-          status: 503,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    } else {
+      console.error("[AUTH ROUTE] Handler.GET is not a function", typeof handler, handler);
+      throw new Error("NextAuth handler not properly initialized");
     }
-  },
-  POST: async (req: Request, context: any) => {
-    // PROD DEBUG: Log on each request
-    console.log("[AUTH ROUTE] POST request received");
-    console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
-    
-    try {
-      return await handler.POST(req, context);
-    } catch (error) {
-      console.error("[AUTH ROUTE] POST handler error:", error);
-      console.error("[AUTH ROUTE] Error stack:", (error as Error).stack);
-      return new Response(
-        JSON.stringify({ error: "Authentication service temporarily unavailable" }),
-        {
-          status: 503,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-  },
-};
+  } catch (error) {
+    console.error("[AUTH ROUTE] GET handler error:", error);
+    console.error("[AUTH ROUTE] Error stack:", (error as Error).stack);
+    // Return a basic error response instead of crashing
+    return new Response(
+      JSON.stringify({ error: "Authentication service temporarily unavailable" }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+}
 
-export const GET = safeHandler.GET;
-export const POST = safeHandler.POST;
+export async function POST(req: Request, context: any) {
+  // PROD DEBUG: Log on each request
+  console.log("[AUTH ROUTE] POST request received");
+  console.log(`[AUTH ROUTE] Providers configured: ${authOptions.providers?.length || 0}`);
+  
+  try {
+    // NextAuth handler returns an object with GET and POST methods
+    if (handler && typeof handler.POST === "function") {
+      return await handler.POST(req, context);
+    } else {
+      console.error("[AUTH ROUTE] Handler.POST is not a function", typeof handler, handler);
+      throw new Error("NextAuth handler not properly initialized");
+    }
+  } catch (error) {
+    console.error("[AUTH ROUTE] POST handler error:", error);
+    console.error("[AUTH ROUTE] Error stack:", (error as Error).stack);
+    return new Response(
+      JSON.stringify({ error: "Authentication service temporarily unavailable" }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+}
 
