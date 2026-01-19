@@ -113,9 +113,17 @@ export const authOptions: NextAuthOptions = {
             });
             console.log(`[AUTH] Created new user ${email} with role ${role}`);
           }
-        } catch (error) {
-          console.error("[AUTH] Error in signIn callback:", error);
-          // Don't block sign in if DB operation fails
+        } catch (error: any) {
+          // Don't block sign in if DB operation fails (e.g., database unavailable)
+          const errorName = error?.name || "UnknownError";
+          const errorMessage = error?.message || String(error);
+          
+          if (errorName === "PrismaClientInitializationError" || errorMessage.includes("Can't reach database")) {
+            console.warn(`[AUTH] Database unavailable - allowing sign in without DB update for ${email}`);
+          } else {
+            console.error("[AUTH] Error in signIn callback:", error);
+          }
+          // Continue with sign in even if DB fails
         }
       }
       return true;
@@ -136,8 +144,16 @@ export const authOptions: NextAuthOptions = {
               token.id = dbUser.id;
               token.role = dbUser.role;
             }
-          } catch (error) {
-            console.error("[AUTH] Error fetching user role:", error);
+          } catch (error: any) {
+            // Don't fail if DB is unavailable - use email-based role check as fallback
+            const errorMessage = error?.message || String(error);
+            if (error?.name === "PrismaClientInitializationError" || errorMessage.includes("Can't reach database")) {
+              console.warn(`[AUTH] Database unavailable - using email-based role for ${user.email}`);
+              // Fallback: set role based on email allowlist
+              token.role = isAdminEmail(user.email) ? "admin" : "support";
+            } else {
+              console.error("[AUTH] Error fetching user role:", error);
+            }
           }
         }
       }
@@ -153,8 +169,16 @@ export const authOptions: NextAuthOptions = {
             token.id = dbUser.id;
             token.role = dbUser.role;
           }
-        } catch (error) {
-          console.error("[AUTH] Error refreshing user role:", error);
+        } catch (error: any) {
+          // Don't fail if DB is unavailable - use email-based role check as fallback
+          const errorMessage = error?.message || String(error);
+          if (error?.name === "PrismaClientInitializationError" || errorMessage.includes("Can't reach database")) {
+            console.warn(`[AUTH] Database unavailable - using email-based role for ${token.email}`);
+            // Fallback: set role based on email allowlist
+            token.role = isAdminEmail(token.email as string) ? "admin" : "support";
+          } else {
+            console.error("[AUTH] Error refreshing user role:", error);
+          }
         }
       }
 
