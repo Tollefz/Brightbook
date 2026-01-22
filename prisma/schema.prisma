@@ -4,7 +4,23 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
+  // DATABASE_URL: Pooled connection for application queries (recommended for serverless/production)
+  // For Neon: Use the connection string with "-pooler" in the hostname
+  // Example: postgresql://user:password@ep-xxx-pooler.us-east-1.aws.neon.tech/db?sslmode=require
   url       = env("DATABASE_URL")
+  
+  // DIRECT_URL: Direct connection for migrations and schema operations (required for Prisma Migrate)
+  // For Neon: Use the connection string WITHOUT "-pooler" in the hostname
+  // Example: postgresql://user:password@ep-xxx.us-east-1.aws.neon.tech/db?sslmode=require
+  // 
+  // Why both are needed:
+  // - Pooled connections (DATABASE_URL) are optimized for serverless environments (Vercel)
+  //   and handle connection pooling automatically, but don't support all Prisma operations
+  // - Direct connections (DIRECT_URL) are required for migrations, schema introspection,
+  //   and other administrative operations that need a persistent connection
+  // 
+  // If DIRECT_URL is not set, Prisma migrate deploy will fail with:
+  // "Environment variable not found: DIRECT_URL"
   directUrl = env("DIRECT_URL")
 }
 

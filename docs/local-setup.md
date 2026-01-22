@@ -27,8 +27,24 @@ npm install
 Opprett en `.env` fil i prosjektroten med følgende variabler:
 
 ```env
-# ⚠️ PÅKREVD - Database connection
+# ⚠️ PÅKREVD - Database connection (Pooled)
+# For Neon: Use connection string with "-pooler" in hostname
+# Example: postgresql://user:password@ep-xxx-pooler.us-east-1.aws.neon.tech/db?sslmode=require
 DATABASE_URL="postgresql://user:password@host/database?sslmode=require"
+
+# ⚠️ PÅKREVD - Database connection (Direct)
+# For Neon: Use connection string WITHOUT "-pooler" in hostname
+# Example: postgresql://user:password@ep-xxx.us-east-1.aws.neon.tech/db?sslmode=require
+# 
+# Why both are needed:
+# - DATABASE_URL (pooled): Optimized for serverless/production, handles connection pooling
+# - DIRECT_URL (direct): Required for Prisma migrations and schema operations
+# 
+# To get both from Neon Dashboard:
+# 1. Go to Connection Details
+# 2. Copy "Pooled connection" → DATABASE_URL
+# 3. Copy "Direct connection" → DIRECT_URL
+DIRECT_URL="postgresql://user:password@host/database?sslmode=require"
 
 # ⚠️ PÅKREVD - Store configuration
 DEFAULT_STORE_ID="default-store"
@@ -60,10 +76,22 @@ UPLOADTHING_APP_ID="..."
 4. **Kopier "Connection string"** (bruk **pooler** versjonen for produksjon)
 5. **Lim inn i `.env` som `DATABASE_URL`**
 
-**Eksempel:**
+**Eksempel (Neon):**
 ```
+# Pooled connection (for app queries)
 DATABASE_URL="postgresql://user:password@ep-xxx-pooler.us-east-1.aws.neon.tech/db?sslmode=require"
+
+# Direct connection (for migrations)
+DIRECT_URL="postgresql://user:password@ep-xxx.us-east-1.aws.neon.tech/db?sslmode=require"
 ```
+
+**💡 Hvorfor begge trengs:**
+- **DATABASE_URL (pooled)**: Optimal for serverless miljøer som Vercel. Håndterer connection pooling automatisk.
+- **DIRECT_URL (direct)**: Påkrevd for Prisma migrasjoner (`prisma migrate deploy`) og schema-operasjoner.
+
+**I Neon Dashboard:**
+- "Pooled connection" → kopier til `DATABASE_URL`
+- "Direct connection" → kopier til `DIRECT_URL`
 
 ### For lokal utvikling:
 
@@ -150,13 +178,19 @@ Hvis du får denne feilen, sjekk:
 For å starte appen lokalt, trenger du **minst**:
 
 ```env
-DATABASE_URL="postgresql://..."
+# Database connections (begge påkrevd for Neon)
+DATABASE_URL="postgresql://user:password@ep-xxx-pooler.us-east-1.aws.neon.tech/db?sslmode=require"
+DIRECT_URL="postgresql://user:password@ep-xxx.us-east-1.aws.neon.tech/db?sslmode=require"
+
 DEFAULT_STORE_ID="default-store"
 NEXTAUTH_SECRET="minst-32-tegn-lang-nøkkel"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
-**Merk:** Uten disse vil appen ikke starte eller fungere korrekt.
+**Merk:** 
+- Uten disse vil appen ikke starte eller fungere korrekt
+- `DIRECT_URL` er påkrevd for Prisma migrasjoner (`prisma migrate deploy`)
+- Se [Prisma + Neon Setup Guide](./prisma-neon-setup.md) for detaljer
 
 ## Verifisering
 

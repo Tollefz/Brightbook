@@ -86,17 +86,25 @@ Dette vil:
 3. **Opprett `.env` fil** med minimum variabler:
 
 ```env
-# ⚠️ PÅKREVD
-DATABASE_URL="postgresql://user:password@host/database?sslmode=require"
+# ⚠️ PÅKREVD - Database connections
+# For Neon: Get both from Dashboard → Connection Details
+DATABASE_URL="postgresql://user:password@ep-xxx-pooler.us-east-1.aws.neon.tech/db?sslmode=require"
+DIRECT_URL="postgresql://user:password@ep-xxx.us-east-1.aws.neon.tech/db?sslmode=require"
+
 DEFAULT_STORE_ID="default-store"
 NEXTAUTH_SECRET="din-super-hemmelige-nøkkel-her-minst-32-tegn"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
-**💡 Hvordan få DATABASE_URL:**
+**💡 Hvordan få DATABASE_URL og DIRECT_URL:**
 - Opprett gratis konto på [Neon](https://neon.tech)
 - Gå til Dashboard → Connection Details
-- Kopier connection string til `.env`
+- Kopier "Pooled connection" → `DATABASE_URL`
+- Kopier "Direct connection" → `DIRECT_URL`
+
+**Hvorfor begge trengs:**
+- `DATABASE_URL` (pooled): For app queries i produksjon (optimal for serverless)
+- `DIRECT_URL` (direct): Påkrevd for Prisma migrasjoner (`prisma migrate deploy`)
 
 4. **Sett opp databasen**
 
@@ -135,9 +143,12 @@ npm run dev
 3. **Konfigurer miljøvariabler i Vercel**
    - Gå til Project → Settings → Environment Variables
    - Legg til alle variabler fra `.env` (se over)
-   - **VIKTIG:** For `DATABASE_URL`, bruk Neon **POOLER** connection string:
+   - **VIKTIG:** For Neon, legg til BEGGE connection strings:
+     - `DATABASE_URL`: Bruk "Pooled connection" (med `-pooler` i hostname)
+     - `DIRECT_URL`: Bruk "Direct connection" (uten `-pooler` i hostname)
      ```
-     postgresql://user:password@ep-xxx-pooler.us-east-1.aws.neon.tech/db?sslmode=require
+     DATABASE_URL="postgresql://user:password@ep-xxx-pooler.us-east-1.aws.neon.tech/db?sslmode=require"
+     DIRECT_URL="postgresql://user:password@ep-xxx.us-east-1.aws.neon.tech/db?sslmode=require"
      ```
 
 4. **Konfigurer Build Command**
