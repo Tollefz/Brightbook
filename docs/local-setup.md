@@ -169,6 +169,14 @@ Hvis du får denne feilen, sjekk:
 - **Årsak:** Database-navn i `DATABASE_URL` er feil
 - **Fix:** Sjekk database-navn i Neon Dashboard
 
+#### "Environment variable not found: DIRECT_URL"
+- **Årsak:** `DIRECT_URL` mangler i `.env` eller Vercel environment variables
+- **Fix:** 
+  1. Legg til `DIRECT_URL` i `.env` (lokalt)
+  2. Legg til `DIRECT_URL` i Vercel → Settings → Environment Variables (produksjon)
+  3. Kopier "Direct connection" fra Neon Dashboard (uten `-pooler` i hostname)
+  4. Se [Prisma + Neon Setup Guide](./prisma-neon-setup.md) for detaljer
+
 #### "DEFAULT_STORE_ID is not set"
 - **Årsak:** `DEFAULT_STORE_ID` mangler i `.env`
 - **Fix:** Legg til `DEFAULT_STORE_ID="default-store"` i `.env`

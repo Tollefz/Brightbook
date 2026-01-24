@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import NightReadingLanding from "@/components/landing/NightReadingLanding";
 import { product as productConfig } from "@/config/product";
-import { getHeroProduct } from "@/lib/get-hero-product";
+import { getLandingProduct } from "@/lib/get-hero-product";
 
 export const dynamic = "force-dynamic";
 
@@ -10,14 +10,14 @@ export const dynamic = "force-dynamic";
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.bookbright.no";
 
 export async function generateMetadata(): Promise<Metadata> {
-  // Fetch hero product from database with fallback logic
-  const heroResult = await getHeroProduct();
-  const heroProduct = heroResult.product;
+  // Fetch the specific LED product for the landing page
+  const landingResult = await getLandingProduct();
+  const landingProduct = landingResult.product;
 
   // Fallback to config if product not found in DB or DB error
-  const productName = heroProduct?.name || productConfig.name;
-  const productDescription = heroProduct?.description || heroProduct?.shortDescription || productConfig.description;
-  const brand = (heroProduct?.specs as any)?.brand || productConfig.brand;
+  const productName = landingProduct?.name || productConfig.name;
+  const productDescription = landingProduct?.description || landingProduct?.shortDescription || productConfig.description;
+  const brand = (landingProduct?.specs as any)?.brand || productConfig.brand;
 
   return {
     title: `${brand} - ${productName}`,
@@ -62,39 +62,40 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  // Fetch hero product from database with fallback logic
-  const heroResult = await getHeroProduct();
-  const heroProduct = heroResult.product;
+  // Fetch the specific LED product for the landing page
+  const landingResult = await getLandingProduct();
+  const landingProduct = landingResult.product;
 
   // Log result for debugging (dev only)
-  if (process.env.NODE_ENV === 'development' && heroResult.error) {
-    console.warn(`[HomePage] Hero product fetch: source=${heroResult.source}, error=${heroResult.error}`);
+  if (process.env.NODE_ENV === 'development' && landingResult.error) {
+    console.warn(`[HomePage] Landing product fetch: source=${landingResult.source}, error=${landingResult.error}`);
   }
 
-  // If no hero product found (DB error or no products exist), show empty state
-  if (!heroProduct) {
+  // If no landing product found, show fallback UI (not blank page)
+  if (!landingProduct) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-amber-50/30 via-white to-white">
         <div className="text-center max-w-md mx-auto px-4">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            {heroResult.source === 'none' 
-              ? 'Ingen produkter enda' 
-              : 'Ingen hero-produkt valgt enda'}
+            Produktet er ikke tilgjengelig enda
           </h1>
           <p className="text-lg text-gray-600 mb-6">
-            {heroResult.source === 'none'
-              ? 'Legg til produkter i admin-panelet for å vise dem på forsiden.'
-              : 'Gå til admin-panelet og merk et produkt som "Hero" (isHero=true) for å vise det på forsiden.'}
+            Vi jobber med å gjøre LED-leseskjermen tilgjengelig. Sjekk tilbake snart!
           </p>
-          <a
-            href="/admin/products"
-            className="inline-block px-6 py-3 rounded-full bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-colors"
-          >
-            Gå til admin
-          </a>
-          {process.env.NODE_ENV === 'development' && heroResult.error && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-500">
+              I mellomtiden kan du se på våre andre produkter.
+            </p>
+            <a
+              href="/products"
+              className="inline-block px-6 py-3 rounded-full bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-colors"
+            >
+              Se alle produkter
+            </a>
+          </div>
+          {process.env.NODE_ENV === 'development' && landingResult.error && (
             <p className="mt-4 text-sm text-gray-500">
-              Debug: {heroResult.error}
+              Debug: {landingResult.error}
             </p>
           )}
         </div>
@@ -105,9 +106,9 @@ export default async function HomePage() {
   // Parse images from JSON string
   let images: string[] = [];
   try {
-    images = typeof heroProduct.images === 'string' 
-      ? JSON.parse(heroProduct.images) 
-      : (Array.isArray(heroProduct.images) ? heroProduct.images : []);
+    images = typeof landingProduct.images === 'string'
+      ? JSON.parse(landingProduct.images)
+      : (Array.isArray(landingProduct.images) ? landingProduct.images : []);
   } catch {
     images = [];
   }
@@ -115,5 +116,5 @@ export default async function HomePage() {
   // Get first image as hero image, fallback to config image
   const heroImage = images[0] || productConfig.heroImage || "/products/bookbright/BR.avif";
 
-  return <NightReadingLanding product={heroProduct} heroImage={heroImage} images={images} />;
+  return <NightReadingLanding product={landingProduct} heroImage={heroImage} images={images} />;
 }

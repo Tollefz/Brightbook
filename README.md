@@ -418,6 +418,40 @@ npm run db:deploy
 
 **VIKTIG:** Migrasjoner kjøres IKKE automatisk på Vercel. Kjør `db:deploy` manuelt etter schema-endringer.
 
+### Produkt Data Migrasjon
+
+For å migrere produkt-data mellom databaser (f.eks. fra gammel til ny Neon DB):
+
+```bash
+# Migrer produkter og varianter fra gammel DB til ny DB
+OLD_DB_URL="postgresql://..." NEW_DB_URL="postgresql://..." npx tsx scripts/migrate-products.ts
+
+# Dry run (test uten å endre data)
+OLD_DB_URL="postgresql://..." NEW_DB_URL="postgresql://..." DRY_RUN=true npx tsx scripts/migrate-products.ts
+```
+
+**PowerShell (Windows):**
+```powershell
+# Sett miljøvariabler
+$env:OLD_DB_URL="postgresql://electrohype-db-connection-string"
+$env:NEW_DB_URL="postgresql://bookbright-db-connection-string"
+$env:DRY_RUN="true"
+
+# Kjør migrering
+npx tsx scripts/migrate-products.ts
+```
+
+**Hva migreres:**
+- ✅ `Product` - produkter med alle felt
+- ✅ `ProductVariant` - produktvarianter
+- ❌ `User`, `Order`, `Customer` - hoppes over (unngår ordre/brukerdata)
+
+**Upsert-strategi:**
+- Produkter: bruker `slug` som unik nøkkel
+- Varianter: bruker `sku` som unik nøkkel (hvis finnes), ellers opprettes nye
+
+**Logging:** Kun antall records, ikke connection strings.
+
 ## 🧪 Testing
 
 ### Lokal build test

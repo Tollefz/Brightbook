@@ -8,27 +8,33 @@ export interface HeroProductResult {
   error?: string;
 }
 
+export interface LandingProductResult {
+  product: Product | null;
+  source: 'led-product' | 'none';
+  error?: string;
+}
+
 /**
  * Get hero product with fallback logic:
  * 1. Try to find product with isHero=true and isActive=true
  * 2. If not found, fallback to newest active product
  * 3. If still not found, return null
- * 
+ *
  * This ensures the homepage always has a product to display if any products exist,
  * and gracefully handles the case when no products exist yet.
- * 
+ *
  * Never throws - always returns a result with source and optional error.
  */
 export async function getHeroProduct(): Promise<HeroProductResult> {
   // Strategy 1: Try to find explicitly marked hero product
   let heroProduct: Product | null = null;
   let strategy1Error: string | undefined = undefined;
-  
+
   try {
     heroProduct = await safeQuery(
       () => prisma.product.findFirst({
-        where: { 
-          isHero: true, 
+        where: {
+          isHero: true,
           isActive: true,
           // Ensure product has stock or at least one active variant with stock
           // OR condition: product has stock > 0 OR has at least one variant with stock > 0
@@ -67,11 +73,11 @@ export async function getHeroProduct(): Promise<HeroProductResult> {
   // Strategy 2: Fallback to newest active product
   let fallbackProduct: Product | null = null;
   let strategy2Error: string | undefined = undefined;
-  
+
   try {
     fallbackProduct = await safeQuery(
       () => prisma.product.findFirst({
-        where: { 
+        where: {
           isActive: true,
           // Ensure product has stock or at least one active variant with stock
           // OR condition: product has stock > 0 OR has at least one variant with stock > 0
@@ -80,8 +86,8 @@ export async function getHeroProduct(): Promise<HeroProductResult> {
             { variants: { some: { isActive: true, stock: { gt: 0 } } } },
           ],
         },
-        orderBy: { 
-          createdAt: 'desc' 
+        orderBy: {
+          createdAt: 'desc'
         },
         include: {
           variants: {
@@ -115,6 +121,57 @@ export async function getHeroProduct(): Promise<HeroProductResult> {
     product: null,
     source: 'none',
     error: strategy1Error || strategy2Error || 'No active products found',
+  };
+}
+
+/**
+ * Get the specific LED reading screen product for the landing page
+ * This fetches the product with slug 'luminera-led-leseskjerm' for the single-product landing page
+ *
+ * Never throws - always returns a result with source and optional error.
+ */
+export async function getLandingProduct(): Promise<LandingProductResult> {
+  let landingProduct: Product | null = null;
+  let error: string | undefined = undefined;
+
+  try {
+    landingProduct = await safeQuery(
+      () => prisma.product.findFirst({
+        where: {
+          slug: 'luminera-led-leseskjerm',
+          isActive: true,
+        },
+        include: {
+          variants: {
+            where: { isActive: true },
+            orderBy: [
+              { sortOrder: 'asc' },
+              { price: 'asc' },
+            ],
+          },
+        },
+      }),
+      null,
+      'getLandingProduct:luminera-led-leseskjerm'
+    );
+  } catch (err: any) {
+    error = err?.message || 'Unknown error fetching landing product';
+    console.error('Unexpected error in getLandingProduct:', err);
+  }
+
+  if (landingProduct) {
+    return {
+      product: landingProduct,
+      source: 'led-product',
+      ...(error && { error }),
+    };
+  }
+
+  // No product found
+  return {
+    product: null,
+    source: 'none',
+    error: error || 'LED product not found',
   };
 }
 
